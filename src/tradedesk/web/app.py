@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
@@ -7,12 +8,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
 
+from tradedesk import wire
 from tradedesk.binance import market_data
 from tradedesk.desk import Desk
+from tradedesk.replay import replay
 
 HERE = Path(__file__).parent
 DIST = HERE / "dist"
-TIMEFRAMES = {"4h", "1d", "1w"}
+TIMEFRAMES = {"1h", "4h", "1d", "1w"}
 NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>tradedesk · Trading floor</title>
 <p>The dashboard isn't built. Run <code>cd frontend && pnpm install && pnpm build</code>.</p>"""
 md = MarkdownIt("commonmark", {"html": False, "linkify": False}).enable("table")
@@ -82,6 +85,52 @@ def create_app(desk: Desk) -> FastAPI:
         path = desk.run_dir(run_id) / "facts.json"
         return json.loads(path.read_text()) if path.exists() else {}
 
+    @app.get("/api/news")
+    def headlines() -> list[dict]:
+        return wire.headlines()[:150]
+
+    @app.get("/api/report")
+    def report() -> dict:
+        """Everything since this database started: runs, every idea replayed on real 1h candles."""
+        settings = desk.settings
+        runs = db.all("SELECT id, started_at, status, summary FROM runs ORDER BY started_at")
+        calls = {
+            r["run_id"]: r["title"]
+            for r in db.all(
+                "SELECT run_id, title FROM events"
+                " WHERE actor = 'pm' AND kind != 'start' ORDER BY id"
+            )
+        }
+        for r in runs:
+            r["call"] = calls.get(r["id"])
+        plans = db.all("SELECT * FROM plans ORDER BY created_at")
+        equity = db.all("SELECT ts, value FROM equity ORDER BY ts")
+        start_eq = equity[0]["value"] if equity else settings.paper_equity
+        hour = 3_600_000
+        candles: dict[str, list] = {}
+        for p in plans:
+            sym = p["symbol"]
+            if sym not in candles:
+                first = min(q["created_at"] for q in plans if q["symbol"] == sym)
+                start_ms = int(datetime.fromisoformat(first).timestamp() * 1000) - hour
+                try:
+                    candles[sym] = market_data(settings).klines(sym, "1h", 1000, start_ms)
+                except Exception:
+                    candles[sym] = []
+            out = replay(p, candles[sym], settings.execution.entry_ttl_hours)
+            risk = p["risk_amount"] or start_eq * settings.risk.risk_per_trade_pct / 100
+            p["replay"] = out | {"pnl": round(out["r"] * risk, 2)}
+        closed = db.all("SELECT * FROM positions WHERE status = 'closed' ORDER BY closed_at")
+        return {
+            "since": runs[0]["started_at"] if runs else None,
+            "start_equity": start_eq,
+            "equity": equity,
+            "runs": runs,
+            "plans": plans,
+            "closed": closed,
+            "realized": round(sum(p["pnl"] or 0 for p in closed), 2),
+        }
+
     @app.get("/api/state")
     def state() -> dict:
         positions = db.open_positions()
@@ -94,6 +143,8 @@ def create_app(desk: Desk) -> FastAPI:
             "mode": desk.settings.mode,
             "market": desk.settings.market,
             "quote": desk.settings.quote,
+            "limits": desk.settings.risk.model_dump(),
+            "auto_execute": desk.settings.execution.auto_execute,
             "equity": db.all("SELECT ts, value FROM equity ORDER BY ts DESC LIMIT 200")[::-1],
             "positions": positions,
             "plans": db.all(

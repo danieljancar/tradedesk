@@ -63,8 +63,8 @@ const STATIC_SVG = `
 
 type Bubble = { id: number; actor: string; text: string };
 
-export function Floor({ runId, finished, events, fresh, onPick }: {
-  runId: string | null; finished: boolean; events: DeskEvent[]; fresh: DeskEvent[]; onPick: (id: string) => void;
+export function Floor({ runId, finished, events, fresh, onPick, hideSteps = false }: {
+  runId: string | null; finished: boolean; events: DeskEvent[]; fresh: DeskEvent[]; onPick: (id: string) => void; hideSteps?: boolean;
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const rig = useRef<Rig | null>(null);
@@ -171,13 +171,13 @@ export function Floor({ runId, finished, events, fresh, onPick }: {
 
   return (
     <div className="space-y-4">
-      <ol className="flex flex-wrap gap-1.5" aria-label="Progress of this run">
+      {!hideSteps && <ol className="flex flex-wrap gap-1.5" aria-label="Progress of this run">
         {STEPS.map((s, i) => (
           <li key={s.id} className={cn("step", steps[s.id])}>
             <span className="step-pip" aria-hidden="true">{steps[s.id] === "done" ? "✓" : i + 1}</span>{s.label}
           </li>
         ))}
-      </ol>
+      </ol>}
       <div className="stage-scroll">
         <div className="stage">
           <svg ref={svg} viewBox={`0 0 ${W} ${H}`} className="floor" role="group" aria-label="The desk: data feeds, analysts, debate, decision, risk check and exchange" />

@@ -34,7 +34,7 @@ function css(name: string, alpha = 1) {
 
 export type Levels = { support: number[]; resistance: number[] };
 
-export function PriceChart({ asset, tf, levels, height = 300 }: { asset: string; tf: string; levels?: Levels; height?: number }) {
+export function PriceChart({ asset, tf, levels, height = 300, emas = true }: { asset: string; tf: string; levels?: Levels; height?: number | string; emas?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<Candle[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function PriceChart({ asset, tf, levels, height = 300 }: { asset: string;
       autoSize: true,
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: fg, fontFamily: "Geist Variable, sans-serif", attributionLogo: false },
       grid: { vertLines: { visible: false }, horzLines: { color: grid, style: LineStyle.Dotted } },
-      rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.08, bottom: 0.22 } },
+      rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.06, bottom: 0.2 } },
       timeScale: { borderVisible: false, timeVisible: tf === "4h", rightOffset: 4 },
       crosshair: { mode: CrosshairMode.Magnet },
       handleScroll: { mouseWheel: false, pressedMouseMove: true },
@@ -80,7 +80,7 @@ export function PriceChart({ asset, tf, levels, height = 300 }: { asset: string;
     const upSoft = css("--up", 0.33), downSoft = css("--down", 0.33);
     vol.setData(data.map((c) => ({ time: t(c), value: c.volume, color: c.close >= c.open ? upSoft : downSoft })));
     const closes = data.map((c) => c.close);
-    for (const [p, color] of [[20, css("--ema20")], [50, css("--ema50")], [200, css("--ema200")]] as const) {
+    for (const [p, color] of emas ? [[20, css("--ema20")], [50, css("--ema50")], [200, css("--ema200")]] as const : []) {
       const e = ema(closes, p);
       if (e.every((x) => x == null)) continue;
       const s = chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
@@ -96,7 +96,7 @@ export function PriceChart({ asset, tf, levels, height = 300 }: { asset: string;
     }
     chart.timeScale().setVisibleLogicalRange({ from: data.length - (tf === "1w" ? 80 : 110), to: data.length + 3 });
     return () => chart.remove();
-  }, [data, levels, tf, scheme]);
+  }, [data, levels, tf, scheme, emas]);
 
   if (err) return <p className="grid place-items-center text-sm text-muted-foreground" style={{ height }}>Couldn't load candles: {err}</p>;
   return (

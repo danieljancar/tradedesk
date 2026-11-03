@@ -269,28 +269,28 @@ export function readAsset(asset: string, f: any) {
 
   lines.push({
     key: "trend", label: "Trend",
-    value: ["4h", "1d", "1w"].map((tf) => `${tf} ${trends[tf].dir}`).join(" · "),
+    value: ["4h", "1d", "1w"].map((tf) => `${tf} ${{ up: "▲", down: "▼", range: "▸", none: "·" }[trends[tf].dir as string]}`).join("  "),
     text: `Days (4h): ${trends["4h"].text}. Weeks (1d): ${trends["1d"].text}. Months (1w): ${trends["1w"].text}.`,
     term: "ema",
   });
   if (d1.rsi != null) lines.push({
-    key: "rsi", label: "Daily RSI", value: d1.rsi.toFixed(0), term: "rsi",
+    key: "rsi", label: "RSI 1d", value: d1.rsi.toFixed(0), term: "rsi",
     text: `${d1.rsi.toFixed(0)} is ${rsiRead(d1.rsi)}.`,
     tone: d1.rsi >= 55 ? "up" : d1.rsi <= 45 ? "down" : "flat",
   });
   if (d1.macd_h != null) lines.push({
-    key: "macd", label: "Daily momentum", value: d1.macd_h >= 0 ? "building" : "fading", term: "macd",
+    key: "macd", label: "Momentum", value: d1.macd_h >= 0 ? "rising" : "fading", term: "macd",
     text: d1.macd_h >= 0
       ? "The MACD histogram is positive: the short-term trend is pulling ahead of the longer one."
       : "The MACD histogram is negative: the short-term trend is losing ground to the longer one.",
     tone: d1.macd_h >= 0 ? "up" : "down",
   });
   if (d1.atr != null) lines.push({
-    key: "atr", label: "Normal daily move", value: `±${px(d1.atr)} (${d1.atr_pct.toFixed(1)}%)`, term: "atr",
+    key: "atr", label: "ATR 1d", value: `${d1.atr_pct.toFixed(1)}%`, term: "atr",
     text: `On a normal day ${asset} swings about ${px(d1.atr)}. A stop closer than half of that (${px(d1.atr / 2)}) gets hit by noise, so the risk engine refuses it.`,
   });
   if (lv.below || lv.above) lines.push({
-    key: "levels", label: "Floor and ceiling",
+    key: "levels", label: "Support → Res.",
     value: `${lv.below ? px(lv.below) : "?"} → ${lv.above ? px(lv.above) : "?"}`, term: "support",
     text: [
       lv.below && `Buyers stepped in near ${px(lv.below)} before, ${((price - lv.below) / price * 100).toFixed(1)}% below now.`,
@@ -298,14 +298,14 @@ export function readAsset(asset: string, f: any) {
     ].filter(Boolean).join(" "),
   });
   if (d1.vol_ratio != null) lines.push({
-    key: "vol", label: "Activity", term: "volume",
-    value: d1.vol_ratio < 0.7 ? "quiet" : d1.vol_ratio > 1.5 ? "busy" : "normal",
+    key: "vol", label: "Volume", term: "volume",
+    value: `${d1.vol_ratio.toFixed(1)}×`,
     text: `Today's volume is ${d1.vol_ratio.toFixed(1)}× the 20-day average. ${d1.vol_ratio < 0.7 ? "Moves on thin volume are less trustworthy." : d1.vol_ratio > 1.5 ? "Something is going on, moves carry more weight." : "Nothing unusual."}`,
   });
   if (der) {
     const fr = der.funding_pct;
     lines.push({
-      key: "funding", label: "Funding", value: `${fr >= 0 ? "+" : ""}${fr.toFixed(4)}% / 8h`, term: "funding",
+      key: "funding", label: "Funding", value: `${fr >= 0 ? "+" : ""}${fr.toFixed(4)}%`, term: "funding",
       text: Math.abs(fr) <= 0.011
         ? "Right at the default baseline. Futures traders aren't paying up to hold either side."
         : fr > 0 ? "Longs are paying above baseline to stay in. The long side is getting crowded."
@@ -314,7 +314,7 @@ export function readAsset(asset: string, f: any) {
     });
     const ls = der.long_short_ratio;
     lines.push({
-      key: "ls", label: "Long/short", value: `${ls.toFixed(2)} : 1`, term: "longshort",
+      key: "ls", label: "Long/short", value: ls.toFixed(2), term: "longshort",
       text: ls > 2
         ? `${ls.toFixed(2)} accounts long for every short. The crowd is leaning up. If price dips, their exits can make the drop sharper.`
         : ls < 0.8 ? "More accounts short than long. A rise could squeeze them out and speed it up."
@@ -323,7 +323,7 @@ export function readAsset(asset: string, f: any) {
     });
     const oi = der.oi_change_7d_pct;
     lines.push({
-      key: "oi", label: "Open interest, 7d", value: pc(oi, 1), term: "oi",
+      key: "oi", label: "OI 7d", value: pc(oi, 1), term: "oi",
       text: oi < -2 ? "Traders are closing futures bets. Less fuel for a big move either way."
         : oi > 2 ? "New money is opening futures bets. Moves can get bigger from here."
           : "Roughly unchanged this week.",

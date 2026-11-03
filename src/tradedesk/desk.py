@@ -175,6 +175,10 @@ class Desk:
             for r in results:
                 if r.get("status") == "proposed":
                     self.approve(r["id"])
+        passed = sum(r.get("status") in ("proposed", "approved") for r in results)
+        failed = sum(r.get("status") == "rejected" for r in results)
+        summary = f"{passed} passed, {failed} rejected" if results else "Nothing to check"
+        self.log("risk", "reject" if failed and not passed else "output", summary)
         return results
 
     def _check_idea(self, run_id, idea: TradeIdea, book: risk.Book, facts: dict) -> dict:
