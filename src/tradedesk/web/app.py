@@ -1,15 +1,18 @@
 import json
+import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
 
-from tradedesk import macro, wire
+from tradedesk import macro, notes, settings_io, wire
 from tradedesk.binance import market_data
+from tradedesk.config import ROOT
 from tradedesk.desk import Desk
 from tradedesk.replay import replay
 
@@ -186,6 +189,70 @@ def create_app(desk: Desk) -> FastAPI:
         except ValueError as e:
             raise HTTPException(409, str(e)) from e
         return {"result": "closed"}
+
+    @app.post("/api/positions/{position_id}/stop")
+    def move_stop(position_id: int, price: float, x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        if db.one("SELECT id FROM positions WHERE id = ? AND status = 'open'", position_id) is None:
+            raise HTTPException(404, "no open position with that id")
+        result = desk.tighten(position_id, price, "moved from dashboard")
+        if result["status"] == "rejected":
+            raise HTTPException(409, "; ".join(result["reasons"]))
+        return result
+
+    @app.get("/api/notes")
+    def list_notes() -> list[dict]:
+        return notes.active(db)
+
+    @app.post("/api/notes")
+    def add_note(body: Annotated[dict, Body()], x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        try:
+            return notes.add(
+                db,
+                body.get("kind", "note"),
+                body.get("text", ""),
+                body.get("asset"),
+                body.get("price"),
+            )
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
+
+    @app.delete("/api/notes/{note_id}")
+    def drop_note(note_id: int, x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        notes.archive(db, note_id)
+        return {"result": "archived"}
+
+    @app.get("/api/settings")
+    def get_settings() -> dict:
+        return settings_io.read()
+
+    @app.put("/api/settings")
+    def put_settings(body: Annotated[dict, Body()], x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        try:
+            new = settings_io.update(body)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
+        for field in ("watchlist", "paper_equity", "risk", "execution", "hold_days"):
+            setattr(desk.settings, field, getattr(new, field))
+        return settings_io.read()
+
+    @app.post("/api/run")
+    def run_now(x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        latest = db.latest_run()
+        if latest and latest["status"] == "running":
+            raise HTTPException(409, "a run is already going")
+        subprocess.Popen(
+            ["bash", str(ROOT / "scripts" / "daily.sh")],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return {"result": "started"}
 
     @app.post("/api/sync")
     def sync(x_desk: str | None = Header(None)) -> dict:

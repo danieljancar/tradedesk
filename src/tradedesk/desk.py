@@ -2,7 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from tradedesk import news, risk, snapshot
+from tradedesk import news, notes, risk, snapshot
 from tradedesk.binance import market_data
 from tradedesk.broker import Broker, Fill, make_broker
 from tradedesk.broker.base import Unprotected
@@ -149,6 +149,7 @@ class Desk:
             )
         if not closed:
             lines.append("- none yet")
+        lines += notes.book_lines(self.db)
         lessons = self.settings.path(Path("lessons.md"))
         lines.append("## Lessons from past reviews")
         lines.append(lessons.read_text().strip() if lessons.exists() else "- none yet")
