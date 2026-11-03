@@ -7,6 +7,7 @@ import { Floor, said } from "@/components/floor";
 import { PriceChart } from "@/components/price-chart";
 import { Prose } from "@/components/prose";
 import { Avatar } from "@/components/panels";
+import { OverviewView } from "@/components/overview";
 import { CAST } from "@/lib/cast";
 import { GLOSSARY, pc, planStory, px, readAsset, readMood } from "@/lib/learn";
 import { api, useInterval, type Candle, type DeskEvent, type DeskState, type Plan, type Run } from "@/lib/api";
@@ -172,7 +173,7 @@ export function TopBar({ assets, asset, setAsset, ticks, facts, state, runs, run
 export function MainPanel({ asset, facts, run, events, fresh, onPick }: {
   asset: string; facts: any; run: Run | undefined; events: DeskEvent[]; fresh: DeskEvent[]; onPick: (id: string) => void;
 }) {
-  const [view, setView] = useState<"chart" | "floor" | "report">("chart");
+  const [view, setView] = useState<"overview" | "chart" | "floor" | "report">("overview");
   const [tf, setTf] = useState<"4h" | "1d" | "1w">("1d");
   const [emas, setEmas] = useState(true);
   const f = facts?.[asset];
@@ -181,8 +182,10 @@ export function MainPanel({ asset, facts, run, events, fresh, onPick }: {
   return (
     <Panel
       className="h-full"
-      title={<Seg value={view} onChange={setView} size="md" options={[{ v: "chart", label: "Chart" }, { v: "floor", label: <span className="flex items-center gap-1.5">Desk{working && <span className="size-1.5 animate-pulse rounded-full bg-up" />}</span> }, { v: "report", label: "Report" }]} />}
-      right={view === "chart" ? (
+      title={<Seg value={view} onChange={setView} size="md" options={[{ v: "overview", label: "Overview" }, { v: "chart", label: "Chart" }, { v: "floor", label: <span className="flex items-center gap-1.5">Desk{working && <span className="size-1.5 animate-pulse rounded-full bg-up" />}</span> }, { v: "report", label: "Report" }]} />}
+      right={view === "overview" ? (
+        <span className="text-xs text-dim">FRED · CoinGecko · DefiLlama · alternative.me</span>
+      ) : view === "chart" ? (
         <>
           <Seg value={tf} onChange={setTf} options={(["4h", "1d", "1w"] as const).map((x) => ({ v: x, label: <span className="flex items-center gap-1">{x}{r && <span className={cn("text-[10px]", r.trends[x].dir === "up" ? "text-up" : r.trends[x].dir === "down" ? "text-down" : "text-dim")}>{{ up: "▲", down: "▼", range: "▸", none: "" }[r.trends[x].dir as string]}</span>}</span> }))} />
           <button type="button" onClick={() => setEmas((e) => !e)} aria-pressed={emas}
@@ -201,6 +204,8 @@ export function MainPanel({ asset, facts, run, events, fresh, onPick }: {
         </div>
       ) : view === "report" ? (
         <ReportView />
+      ) : view === "overview" ? (
+        <OverviewView />
       ) : (
         <div className="absolute inset-0 overflow-auto p-3">
           <Floor runId={run?.id ?? null} finished={run?.status !== "running"} events={events} fresh={fresh} onPick={onPick} hideSteps />

@@ -39,6 +39,13 @@ class RiskLimits(BaseModel):
     max_stop_pct: float = Field(15.0, gt=0)
     min_confidence: int = Field(60, ge=0, le=100)
     max_entry_distance_pct: float = Field(8.0, gt=0)
+    # House money: principal is risked at risk_per_trade_pct, profits above it at profit_risk_pct.
+    principal: float | None = Field(None, gt=0)
+    profit_risk_pct: float = Field(0.0, ge=0, le=25)
+    # Share of the principal that open stops may never put at risk, all stops hit at once.
+    floor_pct: float = Field(0.0, ge=0, le=100)
+    # Futures: maintenance margin used to estimate the liquidation price (isolated margin).
+    maintenance_margin_pct: float = Field(0.5, ge=0, le=10)
 
 
 class HoldLimits(BaseModel):

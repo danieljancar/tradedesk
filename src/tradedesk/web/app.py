@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
 
-from tradedesk import wire
+from tradedesk import macro, wire
 from tradedesk.binance import market_data
 from tradedesk.desk import Desk
 from tradedesk.replay import replay
@@ -41,7 +41,7 @@ def create_app(desk: Desk) -> FastAPI:
     @app.get("/api/candles/{asset}")
     def candles(asset: str, tf: str = "1d", limit: int = 200) -> list[dict]:
         asset = asset.upper()
-        if asset not in desk.settings.watchlist or tf not in TIMEFRAMES:
+        if asset not in {*desk.settings.watchlist, "BTC", "ETH"} or tf not in TIMEFRAMES:
             raise HTTPException(404, "unknown asset or timeframe")
         key = (asset, tf, limit)
         hit = cache.get(key)
@@ -84,6 +84,13 @@ def create_app(desk: Desk) -> FastAPI:
             raise HTTPException(404, "unknown run")
         path = desk.run_dir(run_id) / "facts.json"
         return json.loads(path.read_text()) if path.exists() else {}
+
+    @app.get("/api/macro")
+    def macro_overview() -> dict:
+        data = macro.overview()
+        if data is None:
+            raise HTTPException(502, "macro sources did not answer")
+        return data
 
     @app.get("/api/news")
     def headlines() -> list[dict]:

@@ -113,19 +113,35 @@ def check(
     if rr < limits.min_reward_risk:
         reasons.append(f"reward/risk {rr:.2f} below {limits.min_reward_risk}")
 
-    risk_amount = book.equity * limits.risk_per_trade_pct / 100
+    risk_amount = position_risk(settings, book)
+    if limits.principal and limits.floor_pct:
+        room = book.equity - limits.principal * limits.floor_pct / 100 - book.open_risk
+        if room <= 0:
+            reasons.append(
+                f"equity {book.equity:.2f} with open risk {book.open_risk:.2f} is at the "
+                f"protected floor ({limits.floor_pct}% of {limits.principal})"
+            )
+        risk_amount = max(0.0, min(risk_amount, room))
     if (book.open_risk + risk_amount) / book.equity * 100 > limits.max_total_risk_pct:
         reasons.append(
             f"open risk {book.open_risk:.2f} plus this trade exceeds {limits.max_total_risk_pct}%"
         )
 
-    qty = risk_amount / stop_dist
+    qty = risk_amount / stop_dist if risk_amount > 0 else 0.0
     cap = book.equity * limits.max_position_pct / 100
     leverage = 1
     if settings.market is Market.FUTURES:
-        cap *= limits.max_leverage
+        # isolated margin: each position gets its own slice of the account as collateral
+        slot = book.equity / limits.max_open_positions
+        cap = min(cap * limits.max_leverage, slot * limits.max_leverage)
         qty = min(qty, cap / entry)
-        leverage = max(1, min(limits.max_leverage, math.ceil(qty * entry / book.equity)))
+        leverage = max(1, min(limits.max_leverage, math.ceil(qty * entry / slot)))
+        liq_pct = 100 / leverage - limits.maintenance_margin_pct
+        if stop_pct >= liq_pct * 0.8:
+            reasons.append(
+                f"stop is {stop_pct:.1f}% away but at {leverage}x the position would be "
+                f"liquidated around {liq_pct:.1f}%, move the stop closer or skip"
+            )
     else:
         qty = min(qty, cap / entry, book.free_quote * 0.995 / entry)
     qty = rules.qty(qty)
@@ -146,6 +162,16 @@ def check(
         reward_risk=round(rr, 2),
         leverage=leverage,
     )
+
+
+def position_risk(settings: Settings, book: Book) -> float:
+    """Loss at the stop. With a principal set, profits above it are risked at their own rate."""
+    limits = settings.risk
+    if not limits.principal:
+        return book.equity * limits.risk_per_trade_pct / 100
+    on_principal = min(book.equity, limits.principal) * limits.risk_per_trade_pct / 100
+    profit = max(0.0, book.equity - limits.principal)
+    return on_principal + profit * limits.profit_risk_pct / 100
 
 
 def horizon_atr(horizon: Horizon, facts: dict) -> float | None:

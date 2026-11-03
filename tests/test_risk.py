@@ -124,3 +124,48 @@ def test_no_equity_rejects():
 
     v = check(idea(), Settings(), book(equity=0), price=100.5, atr=4, rules=RULES)
     assert not v.ok
+
+
+def test_house_money_risks_profits_at_their_own_rate(settings):
+    from tradedesk.risk import position_risk
+
+    settings.risk.principal = 100
+    settings.risk.risk_per_trade_pct = 2
+    settings.risk.profit_risk_pct = 10
+    assert position_risk(settings, book(equity=100)) == pytest.approx(2.0)
+    assert position_risk(settings, book(equity=150)) == pytest.approx(2.0 + 5.0)
+    assert position_risk(settings, book(equity=80)) == pytest.approx(1.6)
+
+
+def test_floor_shrinks_then_blocks_new_risk(settings):
+    settings.risk.principal = 1000
+    settings.risk.floor_pct = 99
+    v = check(idea(), settings, book(open_risk=5), price=100.5, atr=4, rules=RULES)
+    assert v.risk_amount <= 5.0 + 1e-6
+    v = check(idea(), settings, book(open_risk=10), price=100.5, atr=4, rules=RULES)
+    assert not v.ok and any("protected floor" in r for r in v.reasons)
+
+
+def test_futures_stop_past_liquidation_is_rejected(settings):
+    # big house-money risk on a small margin slot: the stop would sit past liquidation
+    settings.market = Market.FUTURES
+    settings.risk.max_leverage = 20
+    settings.risk.max_position_pct = 100
+    settings.risk.max_open_positions = 4
+    settings.risk.principal = 13
+    settings.risk.profit_risk_pct = 25
+    settings.risk.max_total_risk_pct = 20
+    v = check(
+        idea(), settings, book(equity=200, free_quote=200), price=100.5, atr=None, rules=RULES
+    )
+    assert not v.ok and any("liquidated" in r for r in v.reasons)
+
+
+def test_futures_leverage_uses_margin_slot(settings):
+    settings.market = Market.FUTURES
+    settings.risk.max_leverage = 10
+    settings.risk.max_position_pct = 100
+    settings.risk.max_open_positions = 4
+    v = check(idea(stop=98, take_profit=106), settings, book(), price=100.5, atr=None, rules=RULES)
+    assert v.ok, v.reasons
+    assert v.qty * v.entry / v.leverage <= 1000 / 4 + 1e-6
