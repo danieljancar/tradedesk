@@ -2,7 +2,7 @@
 
 A small crypto desk that runs on your own machine. Claude Code agents read the market every day and argue about it, a risk engine written in plain Python decides what's allowed and how big, and Binance holds the stop for every position. A local dashboard shows the whole thing as it happens.
 
-![The trading floor during a run](docs/floor.png)
+![The trading floor during a run](docs/floor.webp)
 
 ## How a day works
 
