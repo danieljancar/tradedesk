@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tradedesk</title>
+<meta name="description" content="A small crypto desk that runs on your own machine. Agents argue, a plain Python risk engine decides, Binance holds the stop. A hobby project.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%23a6e3b8%22/%3E%3Ccircle cx=%2211%22 cy=%2214%22 r=%222.5%22/%3E%3Ccircle cx=%2221%22 cy=%2214%22 r=%222.5%22/%3E%3Cpath d=%22M11 20q5 4 10 0%22 stroke=%22black%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f7f3ec;
+    --card: #fffdf9;
+    --ink: #1f1d1a;
+    --muted: #6b665e;
+    --line: #e4ddd1;
+    --accent: #1f7a4d;
+    --warn-bg: #fbeee4;
+    --warn-line: #e9c7ad;
+    --code-bg: #efe9df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1a18;
+      --card: #23221f;
+      --ink: #ece7de;
+      --muted: #a39d92;
+      --line: #36332e;
+      --accent: #7fd1a3;
+      --warn-bg: #2e241d;
+      --warn-line: #5a4232;
+      --code-bg: #2b2925;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 16px 64px; }
+  header { margin-bottom: 32px; }
+  h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  h2 { font-size: 19px; margin: 40px 0 8px; }
+  p, li { color: var(--ink); }
+  .lede { font-size: 19px; color: var(--muted); margin: 0; }
+  a { color: var(--accent); }
+  nav { margin-top: 16px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 15px; }
+  figure { margin: 32px 0 8px; }
+  figure img {
+    width: 100%; height: auto; display: block;
+    border: 1px solid var(--line); border-radius: 12px; background: #f7f3ec;
+  }
+  figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
+  ol, ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  code, pre { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre {
+    background: var(--code-bg); padding: 14px 16px; border-radius: 8px;
+    overflow-x: auto; margin: 12px 0;
+  }
+  pre code { background: none; padding: 0; }
+  .note {
+    background: var(--warn-bg); border: 1px solid var(--warn-line);
+    border-radius: 10px; padding: 14px 16px; margin: 24px 0;
+  }
+  .note p { margin: 0; }
+  .legal { font-size: 15px; color: var(--muted); }
+  .legal p, .legal li { color: var(--muted); }
+  footer {
+    margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 14px; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>tradedesk</h1>
+    <p class="lede">A small crypto desk that runs on your own laptop. A few Claude Code agents read the market each morning and argue about it. A risk engine written in plain Python decides what's allowed and how big. Binance holds the stop.</p>
+    <nav>
+      <a href="https://github.com/danieljancar/tradedesk">Source on GitHub</a>
+      <a href="#setup">Setup</a>
+      <a href="#legal">Disclaimer</a>
+    </nav>
+  </header>
+
+  <div class="note">
+    <p>I build this in my spare time. It's not a product or a service, and it isn't financial advice. Use paper mode. If you trade real money with it, that's your call and your risk.</p>
+  </div>
+
+  <figure>
+    <img src="floor.webp" alt="The local dashboard during a run: price, headline and book inputs feed a technical and a news analyst, then a bull and a bear, then the portfolio manager, the risk engine and the exchange." width="960" height="720">
+    <figcaption>The dashboard during a demo run. Click any of them to read what they wrote.</figcaption>
+  </figure>
+
+  <h2>What happens in a day</h2>
+  <ol>
+    <li>The desk pulls candles, funding and open interest from Binance, plus the last 36 hours of headlines, and writes them into short text files.</li>
+    <li>A technical analyst and a news analyst each read their part.</li>
+    <li>A bull and a bear read both reports and make their case. One round, 200 words each.</li>
+    <li>A portfolio manager weighs them and writes trade ideas with entry, stop and target. Passing is a valid answer.</li>
+    <li>The risk engine sizes each idea so a stop-out costs 1% of equity, and throws out anything that breaks a rule.</li>
+    <li>What's left waits for you to approve it. Nothing goes out on its own unless you turn that on.</li>
+  </ol>
+
+  <h2>What it won't do</h2>
+  <ul>
+    <li>Open a position without a stop already on the exchange.</li>
+    <li>Let the agents pick the size, approve trades, edit the risk code or read your API keys.</li>
+    <li>Move a stop against you.</li>
+    <li>Make you money. It's a way to run a process and keep a journal of it.</li>
+  </ul>
+
+  <h2 id="setup">Setup</h2>
+  <p>You need <a href="https://docs.astral.sh/uv/">uv</a> and <a href="https://code.claude.com">Claude Code</a>. Paper mode needs no keys.</p>
+<pre><code>git clone https://github.com/danieljancar/tradedesk.git
+cd tradedesk
+uv sync
+cp desk.example.toml desk.toml
+uv run desk serve      # dashboard on 127.0.0.1:8420
+claude                 # then type /daily</code></pre>
+  <p>Just want to look? <code>uv run desk demo</code> replays a made-up run. The <a href="https://github.com/danieljancar/tradedesk#readme">README</a> covers everything else.</p>
+
+  <section id="legal" class="legal">
+    <h2>Disclaimer</h2>
+    <p>tradedesk is a hobby project, shared as is under the <a href="https://github.com/danieljancar/tradedesk/blob/master/LICENSE">MIT license</a>.</p>
+    <ul>
+      <li>Nothing here or in the software is financial, investment, tax or legal advice. The agents' output is generated text and can be wrong.</li>
+      <li>There is no warranty of any kind. The software may have bugs, the exchange may behave differently than expected, and orders may fail, fill badly or not at all.</li>
+      <li>I'm not responsible for any loss, missed gain or other damage that comes from using it, to the extent the law allows. You run it on your own machine with your own keys and your own money.</li>
+      <li>Trading crypto, and especially with leverage, can lose you more than you expect. Check that it's legal where you live.</li>
+      <li>This project isn't affiliated with or endorsed by Binance, Anthropic or any news source it reads.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Made by <a href="https://github.com/danieljancar">Daniel Jancar</a> on evenings and weekends.
+  </footer>
+</main>
+</body>
+</html>
