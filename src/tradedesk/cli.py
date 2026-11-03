@@ -37,6 +37,39 @@ def run_finish(summary_file: Path) -> None:
     say("run finished")
 
 
+@run_app.command("recover")
+def run_recover() -> None:
+    """Finish the latest run if the agents stopped half way: check, post, execute, finish."""
+    d = desk()
+    run = d.db.latest_run()
+    if not run or run["status"] != "running":
+        say("nothing to recover")
+        return
+    folder, events = d.run_dir(run["id"]), d.db.events(run["id"])
+    done = {(e["actor"], e["kind"]) for e in events}
+    reads = ["technical", "news", "bull", "bear", "book"]
+    for actor, name in (
+        ("technical", "technical.md"),
+        ("news", "news-read.md"),
+        ("bull", "bull.md"),
+        ("bear", "bear.md"),
+    ):
+        if (folder / name).exists() and (actor, "output") not in done:
+            d.post(actor, folder / name, reads=[])
+    plans = folder / "plans.json"
+    if plans.exists() and not any(e["actor"] == "risk" and e["kind"] != "start" for e in events):
+        d.check_plans(plans)
+    decision = folder / "decision.md"
+    if decision.exists() and ("pm", "output") not in done:
+        d.post("pm", decision, reads=reads)
+    d.execute()
+    summary = folder / "summary.md"
+    d.finish_run(
+        summary.read_text() if summary.exists() else "Run stopped early, finished by recover."
+    )
+    say(f"recovered {run['id']}")
+
+
 @app.command()
 def snapshot() -> None:
     """Prices, indicators, levels and derivatives for the watchlist."""

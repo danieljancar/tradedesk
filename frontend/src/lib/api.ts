@@ -66,7 +66,8 @@ export function useDesk() {
     try {
       const rs = await api<Run[]>("/api/runs");
       setRuns(rs);
-      if (!current.current && rs[0]) await select(rs[0].id);
+      // always follow the newest run, so a run that starts tonight shows up live
+      if (rs[0] && current.current !== rs[0].id) await select(rs[0].id);
       else await poll(true);
     } catch (e) {
       console.error(e);

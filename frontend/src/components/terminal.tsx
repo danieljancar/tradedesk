@@ -3,7 +3,6 @@ import { BookOpen, ChevronRight, Moon, RefreshCw, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Floor, said } from "@/components/floor";
 import { PriceChart } from "@/components/price-chart";
 import { Prose } from "@/components/prose";
@@ -90,9 +89,9 @@ function Spark({ values, up }: { values: number[]; up: boolean }) {
 }
 
 // ---------- top bar ----------
-export function TopBar({ assets, asset, setAsset, ticks, facts, state, runs, runId, select, dark, toggle, onLearn, refresh }: {
+export function TopBar({ assets, asset, setAsset, ticks, facts, state, runs, runId, dark, toggle, onLearn, refresh }: {
   assets: string[]; asset: string; setAsset: (a: string) => void; ticks: Record<string, Tick>; facts: any; state: DeskState | null;
-  runs: Run[]; runId: string | null; select: (id: string) => void; dark: boolean; toggle: () => void; onLearn: () => void; refresh: () => void;
+  runs: Run[]; runId: string | null; dark: boolean; toggle: () => void; onLearn: () => void; refresh: () => void;
 }) {
   const [syncing, setSyncing] = useState(false);
   const eq = state?.equity.at(-1)?.value;
@@ -151,12 +150,16 @@ export function TopBar({ assets, asset, setAsset, ticks, facts, state, runs, run
           <p className="text-[10px] text-dim">Equity</p>
           <p className="font-mono text-[13px] font-medium tabular-nums">{eq == null ? "–" : `${px(eq)} ${state?.quote}`}</p>
         </div>
-        <Select value={runId ?? undefined} onValueChange={select}>
-          <SelectTrigger size="sm" className="hidden h-8 w-40 border-line bg-sunk text-xs sm:flex" aria-label="Run"><SelectValue placeholder="Run" /></SelectTrigger>
-          <SelectContent>
-            {runs.map((r) => <SelectItem key={r.id} value={r.id} className="text-xs">{runLabel(r.id)}{r.status === "running" ? " · live" : ""}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {(() => {
+          const latest = runs.find((r) => r.id === runId);
+          const live = latest?.status === "running";
+          return (
+            <span className={cn("mr-1 hidden items-center gap-1.5 rounded-md px-2 py-1 text-xs sm:flex", live ? "bg-up/12 text-up" : "bg-sunk text-dim")}>
+              <span className={cn("size-1.5 rounded-full", live ? "animate-pulse bg-up" : "bg-dim/60")} />
+              {live ? "Desk working" : latest ? `Idle · last run ${clock(latest.started_at)}` : "No runs yet"}
+            </span>
+          );
+        })()}
         <Button variant="ghost" size="icon" className="size-8" onClick={onLearn} aria-label="Glossary"><BookOpen className="size-4" /></Button>
         <Button variant="ghost" size="icon" className="size-8" onClick={toggle} aria-label={dark ? "Light theme" : "Dark theme"}>{dark ? <Sun className="size-4" /> : <Moon className="size-4" />}</Button>
         <Button variant="ghost" size="icon" className="size-8" onClick={sync} disabled={syncing} aria-label="Sync with exchange"><RefreshCw className={cn("size-4", syncing && "animate-spin")} /></Button>

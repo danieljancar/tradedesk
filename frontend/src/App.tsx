@@ -36,7 +36,7 @@ export default function App() {
       <TermLayer>
         <div className="flex min-h-dvh flex-col bg-bg text-fg lg:h-dvh">
           <TopBar assets={assets} asset={asset} setAsset={setAsset} ticks={ticks} facts={desk.facts} state={desk.state}
-            runs={desk.runs} runId={desk.runId} select={desk.select} dark={dark} toggle={toggle} onLearn={() => setLearn(true)} refresh={desk.refresh} />
+            runs={desk.runs} runId={desk.runId} dark={dark} toggle={toggle} onLearn={() => setLearn(true)} refresh={desk.refresh} />
           <div className="grid min-h-0 flex-1 gap-px bg-line lg:grid-cols-[minmax(0,1fr)_330px] lg:grid-rows-[minmax(0,1fr)_minmax(0,38%)]">
             <div className="h-[62vh] min-h-0 lg:h-auto">
               <MainPanel asset={asset} facts={desk.facts} run={run} events={desk.events} fresh={desk.fresh} onPick={pick} />
