@@ -1,0 +1,44 @@
+[project]
+name = "tradedesk"
+version = "0.1.0"
+description = "Local crypto trading desk run by Claude Code agents, with exchange-side stops and a live view of every decision"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162",
+    "feedparser>=6.0.14",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "markdown-it-py>=4.2",
+    "pydantic>=2.14",
+    "typer>=0.27",
+    "uvicorn>=0.54",
+]
+
+[project.scripts]
+desk = "tradedesk.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2",
+    "respx>=0.23.1",
+    "ruff>=0.17",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tradedesk"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
