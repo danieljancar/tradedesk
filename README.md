@@ -84,6 +84,15 @@ uv run ruff check
 uv run ruff format
 ```
 
+The dashboard is a React app in `frontend/` (Vite, shadcn/ui, Lightweight Charts, Recharts, Motion). The built files are committed in `src/tradedesk/web/dist`, so running the desk only needs uv. To change the UI you need Node and pnpm:
+
+```sh
+cd frontend
+pnpm install
+pnpm dev      # hot reload on :5173, talks to `desk serve` on :8420
+pnpm build    # writes src/tradedesk/web/dist
+```
+
 Binance calls are tested against recorded responses in `tests/test_exchange.py`, the paper flow end to end in `tests/test_paper_flow.py`.
 
 The roles and the debate follow [TradingAgents](https://github.com/TauricResearch/TradingAgents). The order safety rules (protect or close, validate prices in code, never trust a number the model wrote) come from reading [NOFX](https://github.com/NoFxAiOS/nofx) and [Freqtrade](https://www.freqtrade.io).

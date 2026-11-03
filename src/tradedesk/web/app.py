@@ -1,3 +1,5 @@
+import json
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
@@ -5,9 +7,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
 
+from tradedesk.binance import market_data
 from tradedesk.desk import Desk
 
 HERE = Path(__file__).parent
+DIST = HERE / "dist"
+TIMEFRAMES = {"4h", "1d", "1w"}
+NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>tradedesk · Trading floor</title>
+<p>The dashboard isn't built. Run <code>cd frontend && pnpm install && pnpm build</code>.</p>"""
 md = MarkdownIt("commonmark", {"html": False, "linkify": False}).enable("table")
 
 
@@ -18,12 +25,44 @@ def guard(x_desk: str | None) -> None:
 
 def create_app(desk: Desk) -> FastAPI:
     app = FastAPI(title="tradedesk", docs_url=None, redoc_url=None)
-    app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+    if (DIST / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
     db = desk.db
+    cache: dict[tuple, tuple[float, list]] = {}
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
-        return (HERE / "templates" / "index.html").read_text()
+        page = DIST / "index.html"
+        return page.read_text() if page.exists() else NOT_BUILT
+
+    @app.get("/api/candles/{asset}")
+    def candles(asset: str, tf: str = "1d", limit: int = 200) -> list[dict]:
+        asset = asset.upper()
+        if asset not in desk.settings.watchlist or tf not in TIMEFRAMES:
+            raise HTTPException(404, "unknown asset or timeframe")
+        key = (asset, tf, limit)
+        hit = cache.get(key)
+        if hit and time.monotonic() - hit[0] < 60:
+            return hit[1]
+        try:
+            rows = market_data(desk.settings).klines(
+                desk.settings.symbol(asset), tf, max(10, min(limit, 500))
+            )
+        except Exception as e:
+            raise HTTPException(502, f"Binance did not answer: {e}") from e
+        out = [
+            {
+                "time": c.open_time // 1000,
+                "open": c.open,
+                "high": c.high,
+                "low": c.low,
+                "close": c.close,
+                "volume": c.volume,
+            }
+            for c in rows
+        ]
+        cache[key] = (time.monotonic(), out)
+        return out
 
     @app.get("/api/runs")
     def runs() -> list[dict]:
@@ -35,6 +74,13 @@ def create_app(desk: Desk) -> FastAPI:
         for r in rows:
             r["html"] = md.render(r["body"]) if r["body"] else ""
         return rows
+
+    @app.get("/api/runs/{run_id}/facts")
+    def facts(run_id: str) -> dict:
+        if run_id not in {r["id"] for r in db.all("SELECT id FROM runs")}:
+            raise HTTPException(404, "unknown run")
+        path = desk.run_dir(run_id) / "facts.json"
+        return json.loads(path.read_text()) if path.exists() else {}
 
     @app.get("/api/state")
     def state() -> dict:

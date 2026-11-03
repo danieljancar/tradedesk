@@ -29,6 +29,7 @@ def test_actions_need_the_desk_header(settings, db, market):
 def test_page_and_state_load(settings, db, market):
     c, _ = client(settings, db, market)
     assert "Trading floor" in c.get("/").text
+    assert c.get("/api/candles/DOGE").status_code == 404
     state = c.get("/api/state").json()
     assert state["mode"] == "paper"
     assert state["positions"] == []

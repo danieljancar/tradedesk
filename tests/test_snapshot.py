@@ -19,9 +19,11 @@ class TrendMarket(FakeMarket):
 
 
 def test_snapshot_is_compact_and_flags_missing_data(settings, monkeypatch):
-    monkeypatch.setattr(snapshot, "sentiment", lambda: "fear & greed: not available")
+    monkeypatch.setattr(snapshot, "sentiment", lambda: ("fear & greed: not available", {}))
     text, facts = snapshot.build(settings, TrendMarket())
     assert "## BTCUSDT" in text and "## ETHUSDT" in text
     assert "not a measured zero" in text
     assert facts["BTC"]["atr_1d"] > 0
+    assert facts["BTC"]["frames"]["1d"]["rsi"] is not None
+    assert facts["BTC"]["derivatives"] is None
     assert len(text.split()) < 600
