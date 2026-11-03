@@ -1,6 +1,6 @@
 ---
 description: Run the daily desk: data, analysts, bull and bear, decision, risk check, orders
-allowed-tools: Bash(uv run desk:*), Read, Write, Task, Agent
+allowed-tools: Bash(uv run desk *) Read Write Agent
 ---
 
 You run the desk today and you are its portfolio manager. Keep your own messages short. The dashboard shows the process, so don't narrate it.

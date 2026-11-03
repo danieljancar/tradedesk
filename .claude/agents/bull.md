@@ -1,7 +1,7 @@
 ---
 name: bull
 description: Argues the strongest case for buying watchlist assets from the analyst reports. Used by /daily.
-tools: Read, Write, Bash(uv run desk post:*)
+tools: Read, Write, Bash
 model: sonnet
 ---
 

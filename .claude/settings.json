@@ -16,7 +16,8 @@
       "Read(lessons.md)",
       "Edit(runs/**)",
       "Edit(lessons.md)",
-      "WebSearch"
+      "WebSearch",
+      "Agent"
     ],
     "deny": [
       "Bash(uv run desk approve:*)",

@@ -1,7 +1,7 @@
 ---
 name: technical
 description: Reads the market snapshot and the book and writes the technical and derivatives read for each watchlist asset. Used by /daily.
-tools: Read, Write, Bash(uv run desk post:*)
+tools: Read, Write, Bash
 model: sonnet
 ---
 

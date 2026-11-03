@@ -1,7 +1,7 @@
 ---
 name: news
 description: Reads the headlines file, checks the macro calendar with a few web searches and writes the news and macro read. Used by /daily.
-tools: Read, Write, WebSearch, Bash(uv run desk post:*)
+tools: Read, Write, WebSearch, Bash
 model: sonnet
 ---
 

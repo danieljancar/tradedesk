@@ -1,6 +1,6 @@
 ---
 description: Weekly review of closed trades that rewrites lessons.md
-allowed-tools: Bash(uv run desk:*), Read, Write
+allowed-tools: Bash(uv run desk *) Read Write
 ---
 
 Run `uv run desk journal --days 30`. If there are fewer than 3 closed trades, reply "not enough trades to review yet" and stop.

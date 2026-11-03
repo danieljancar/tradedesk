@@ -1,7 +1,7 @@
 ---
 name: bear
 description: Argues the strongest case against buying, and for shorting when futures are enabled, from the analyst reports. Used by /daily.
-tools: Read, Write, Bash(uv run desk post:*)
+tools: Read, Write, Bash
 model: sonnet
 ---
 
