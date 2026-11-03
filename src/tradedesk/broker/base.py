@@ -28,6 +28,10 @@ class Exit:
     pnl: float | None = None
 
 
+class Unprotected(RuntimeError):
+    """A position is open on the exchange without a working stop."""
+
+
 def ms(iso: str) -> int:
     return int(datetime.fromisoformat(iso).timestamp() * 1000)
 
@@ -48,7 +52,8 @@ class Broker(Protocol):
 
     def exit_status(self, position: dict) -> Exit | None: ...
 
-    def cancel(self, plan: dict) -> None: ...
+    def cancel(self, plan: dict) -> Fill | None:
+        """Cancel a resting entry. Returns a Fill when part of it had already filled."""
 
     def close(self, position: dict) -> Exit: ...
 

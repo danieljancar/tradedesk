@@ -1,5 +1,5 @@
-import math
 from dataclasses import dataclass
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from functools import cached_property
 
 from tradedesk.binance.client import Client
@@ -21,14 +21,18 @@ class SymbolRules:
         return floor_to(value, self.step)
 
 
+def _snap(value: float, step: float, rounding: str) -> float:
+    s = Decimal(str(step)).normalize()
+    units = (Decimal(str(value)) / s).quantize(Decimal(1), rounding=rounding)
+    return float(units * s)
+
+
 def floor_to(value: float, step: float) -> float:
-    decimals = max(0, -math.floor(math.log10(step))) if step < 1 else 0
-    return round(math.floor(value / step + 1e-9) * step, decimals)
+    return _snap(value, step, ROUND_DOWN)
 
 
 def round_to(value: float, step: float) -> float:
-    decimals = max(0, -math.floor(math.log10(step))) if step < 1 else 0
-    return round(round(value / step) * step, decimals)
+    return _snap(value, step, ROUND_HALF_UP)
 
 
 class MarketData:

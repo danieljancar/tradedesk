@@ -1,17 +1,24 @@
 import json
 
+import httpx
+
 from tradedesk.binance.client import BinanceError, Client
 from tradedesk.binance.market import MarketData, SymbolRules
-from tradedesk.broker.base import Exit, Fill, Placed
+from tradedesk.broker.base import Exit, Fill, Placed, Unprotected
 from tradedesk.config import Settings
 from tradedesk.db import now
+from tradedesk.risk import SPOT_FEE_BUFFER as FEE_BUFFER
 
-FEE_BUFFER = 0.0015
+DEAD = ("CANCELED", "EXPIRED", "REJECTED", "EXPIRED_IN_MATCH")
 
 
 def avg_price(order: dict) -> float:
     qty = float(order["executedQty"])
     return float(order["cummulativeQuoteQty"]) / qty if qty else 0.0
+
+
+def client_id(plan: dict) -> str:
+    return f"desk-{plan['id']}"
 
 
 class SpotBroker:
@@ -49,6 +56,29 @@ class SpotBroker:
     def _exit_qty(self, symbol: str, qty: float) -> float:
         return self.rules(symbol).qty(qty * (1 - FEE_BUFFER))
 
+    def _order(self, symbol: str, order_id: int) -> dict:
+        return self.client.signed("GET", "/api/v3/order", symbol=symbol, orderId=order_id)
+
+    def _sell(self, symbol: str, qty: float) -> dict:
+        return self.client.signed(
+            "POST",
+            "/api/v3/order",
+            symbol=symbol,
+            side="SELL",
+            type="MARKET",
+            quantity=qty,
+            newOrderRespType="FULL",
+        )
+
+    @staticmethod
+    def _legs(report: dict) -> dict:
+        legs = {}
+        for o in report.get("orderReports", []):
+            kind = {"LIMIT": "entry", "LIMIT_MAKER": "target", "STOP_LOSS": "stop"}.get(o["type"])
+            if kind:
+                legs[kind] = o["orderId"]
+        return legs
+
     def _oco(self, symbol: str, qty: float, stop: float, target: float) -> dict:
         report = self.client.signed(
             "POST",
@@ -64,73 +94,74 @@ class SpotBroker:
         )
         return {"list": report["orderListId"], **self._legs(report)}
 
-    @staticmethod
-    def _legs(report: dict) -> dict:
+    def _protect(self, symbol: str, qty: float, stop: float, target: float) -> dict:
+        """Stop and target for coins already held. Sells them if the OCO doesn't go through."""
+        try:
+            return self._oco(symbol, qty, stop, target)
+        except Exception:
+            self._sell(symbol, qty)
+            raise
+
+    def _resolve_legs(self, symbol: str, listing: dict) -> dict:
         legs = {}
-        for o in report.get("orderReports", []):
-            kind = {"LIMIT": "entry", "LIMIT_MAKER": "target", "STOP_LOSS": "stop"}.get(o["type"])
-            if kind:
-                legs[kind] = o["orderId"]
-        return legs
+        for o in listing["orders"]:
+            legs |= self._legs({"orderReports": [self._order(symbol, o["orderId"])]})
+        return {"list": listing["orderListId"], **legs}
 
     def place(self, plan: dict) -> Placed:
-        symbol, qty = plan["symbol"], plan["qty"]
-        exit_qty = self._exit_qty(symbol, qty)
+        symbol = plan["symbol"]
         if plan["entry_type"] == "market":
-            order = self.client.signed(
-                "POST",
-                "/api/v3/order",
-                symbol=symbol,
-                side="BUY",
-                type="MARKET",
-                quantity=qty,
-                newOrderRespType="FULL",
-            )
-            fill = avg_price(order)
             try:
-                refs = self._oco(symbol, exit_qty, plan["stop"], plan["take_profit"])
-            except BinanceError:
-                self.client.signed(
+                order = self.client.signed(
                     "POST",
                     "/api/v3/order",
                     symbol=symbol,
-                    side="SELL",
+                    side="BUY",
                     type="MARKET",
-                    quantity=exit_qty,
+                    quantity=plan["qty"],
+                    newClientOrderId=client_id(plan),
+                    newOrderRespType="FULL",
                 )
-                raise
-            return Placed(open=True, fill_price=fill, qty=exit_qty, refs=refs)
-        report = self.client.signed(
-            "POST",
-            "/api/v3/orderList/otoco",
+            except httpx.HTTPError:
+                order = self.client.signed(
+                    "GET", "/api/v3/order", symbol=symbol, origClientOrderId=client_id(plan)
+                )
+            filled = float(order["executedQty"])
+            if not filled:
+                raise RuntimeError(f"market buy for plan {plan['id']} did not fill")
+            exit_qty = self._exit_qty(symbol, filled)
+            refs = self._protect(symbol, exit_qty, plan["stop"], plan["take_profit"])
+            return Placed(open=True, fill_price=avg_price(order), qty=exit_qty, refs=refs)
+        params = dict(
             symbol=symbol,
+            listClientOrderId=client_id(plan),
             workingType="LIMIT",
             workingSide="BUY",
             workingPrice=plan["entry"],
-            workingQuantity=qty,
+            workingQuantity=plan["qty"],
             workingTimeInForce="GTC",
             pendingSide="SELL",
-            pendingQuantity=exit_qty,
+            pendingQuantity=self._exit_qty(symbol, plan["qty"]),
             pendingAboveType="LIMIT_MAKER",
             pendingAbovePrice=plan["take_profit"],
             pendingBelowType="STOP_LOSS",
             pendingBelowStopPrice=plan["stop"],
             newOrderRespType="RESULT",
         )
+        try:
+            report = self.client.signed("POST", "/api/v3/orderList/otoco", **params)
+        except httpx.HTTPError:
+            listing = self.client.signed(
+                "GET", "/api/v3/orderList", origClientOrderId=client_id(plan)
+            )
+            return Placed(open=False, refs=self._resolve_legs(symbol, listing))
         refs = {"list": report["orderListId"], **self._legs(report)}
         if not {"entry", "stop", "target"} <= refs.keys():
-            refs |= self._resolve_legs(symbol, report["orderListId"])
+            listing = self.client.signed(
+                "GET", "/api/v3/orderList", orderListId=report["orderListId"]
+            )
+            refs = self._resolve_legs(symbol, listing)
         return Placed(open=False, refs=refs)
-
-    def _resolve_legs(self, symbol: str, list_id: int) -> dict:
-        listing = self.client.signed("GET", "/api/v3/orderList", orderListId=list_id)
-        legs = {}
-        for o in listing["orders"]:
-            legs |= self._legs({"orderReports": [self._order(symbol, o["orderId"])]})
-        return legs
-
-    def _order(self, symbol: str, order_id: int) -> dict:
-        return self.client.signed("GET", "/api/v3/order", symbol=symbol, orderId=order_id)
 
     def entry_status(self, plan: dict) -> Fill | str | None:
         refs = json.loads(plan["exchange"])
@@ -138,18 +169,38 @@ class SpotBroker:
         if order["status"] == "FILLED":
             qty = self._exit_qty(plan["symbol"], float(order["executedQty"]))
             return Fill(price=avg_price(order), qty=qty, at=now(), refs=refs)
-        if order["status"] in ("CANCELED", "EXPIRED", "REJECTED", "EXPIRED_IN_MATCH"):
-            return "cancelled"
+        if order["status"] in DEAD:
+            return self._salvage(plan, order) or "cancelled"
         return None
+
+    def _salvage(self, plan: dict, order: dict) -> Fill | None:
+        """Protect whatever part of a cancelled entry did fill."""
+        filled = float(order["executedQty"])
+        if not filled:
+            return None
+        rules = self.rules(plan["symbol"])
+        qty = self._exit_qty(plan["symbol"], filled)
+        if qty < rules.min_qty or qty * plan["stop"] < rules.min_notional:
+            return None
+        refs = self._protect(plan["symbol"], qty, plan["stop"], plan["take_profit"])
+        return Fill(price=avg_price(order), qty=qty, at=now(), refs=refs)
+
+    def cancel(self, plan: dict) -> Fill | None:
+        refs = json.loads(plan["exchange"])
+        self._cancel_list(plan["symbol"], refs["list"])
+        return self._salvage(plan, self._order(plan["symbol"], refs["entry"]))
 
     def exit_status(self, position: dict) -> Exit | None:
         refs = json.loads(position["exchange"])
-        for leg in ("stop", "target"):
-            order = self._order(position["symbol"], refs[leg])
+        legs = {leg: self._order(position["symbol"], refs[leg]) for leg in ("stop", "target")}
+        for leg, order in legs.items():
             if order["status"] == "FILLED":
                 price = avg_price(order)
                 pnl = (price - position["entry_price"]) * float(order["executedQty"])
                 return Exit(price=price, reason=leg, pnl=pnl)
+        statuses = {o["status"] for o in legs.values()}
+        if "PARTIALLY_FILLED" in statuses or statuses <= set(DEAD):
+            raise Unprotected(f"{position['symbol']} position {position['id']} has no full stop")
         return None
 
     def _cancel_list(self, symbol: str, list_id: int) -> None:
@@ -159,25 +210,24 @@ class SpotBroker:
             if e.code != -2011:
                 raise
 
-    def cancel(self, plan: dict) -> None:
-        self._cancel_list(plan["symbol"], json.loads(plan["exchange"])["list"])
-
     def close(self, position: dict) -> Exit:
+        try:
+            done = self.exit_status(position)
+        except Unprotected:
+            done = None
+        if done:
+            return done
         self._cancel_list(position["symbol"], json.loads(position["exchange"])["list"])
-        order = self.client.signed(
-            "POST",
-            "/api/v3/order",
-            symbol=position["symbol"],
-            side="SELL",
-            type="MARKET",
-            quantity=position["qty"],
-            newOrderRespType="FULL",
-        )
-        price = avg_price(order)
+        price = avg_price(self._sell(position["symbol"], position["qty"]))
         return Exit(
             price=price, reason="manual", pnl=(price - position["entry_price"]) * position["qty"]
         )
 
     def move_stop(self, position: dict, stop: float) -> dict:
-        self._cancel_list(position["symbol"], json.loads(position["exchange"])["list"])
-        return self._oco(position["symbol"], position["qty"], stop, position["take_profit"])
+        symbol, qty, target = position["symbol"], position["qty"], position["take_profit"]
+        self._cancel_list(symbol, json.loads(position["exchange"])["list"])
+        try:
+            return self._oco(symbol, qty, stop, target)
+        except Exception:
+            self._protect(symbol, qty, position["stop"], target)
+            raise

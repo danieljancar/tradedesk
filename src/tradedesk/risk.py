@@ -5,6 +5,8 @@ from tradedesk.binance.market import SymbolRules
 from tradedesk.config import Horizon, Market, Settings
 from tradedesk.models import Rating, Side, TradeIdea
 
+SPOT_FEE_BUFFER = 0.0015
+
 
 @dataclass
 class Book:
@@ -55,6 +57,8 @@ def check(
     rules: SymbolRules,
 ) -> Verdict:
     limits = settings.risk
+    if book.equity <= 0:
+        return Verdict(False, ["no equity on the account"])
     reasons = account_blocks(settings, book)
     s = idea.side.sign
 
@@ -70,7 +74,9 @@ def check(
         reasons.append("short idea with a bullish rating")
     if idea.confidence < limits.min_confidence:
         reasons.append(f"confidence {idea.confidence} below {limits.min_confidence}")
-    if (idea.asset, idea.horizon.value) in book.taken:
+    if settings.market is Market.FUTURES and any(a == idea.asset for a, _ in book.taken):
+        reasons.append(f"already have a {idea.asset} position or order, futures net per symbol")
+    elif (idea.asset, idea.horizon.value) in book.taken:
         reasons.append(f"already have an open or pending {idea.horizon} trade on {idea.asset}")
     if book.open_count >= limits.max_open_positions:
         reasons.append(
@@ -123,7 +129,8 @@ def check(
     else:
         qty = min(qty, cap / entry, book.free_quote * 0.995 / entry)
     qty = rules.qty(qty)
-    if qty < rules.min_qty or qty * entry < rules.min_notional:
+    exit_qty = qty if settings.market is Market.FUTURES else rules.qty(qty * (1 - SPOT_FEE_BUFFER))
+    if exit_qty < rules.min_qty or exit_qty * stop < rules.min_notional:
         reasons.append(
             f"size {qty} ({qty * entry:.2f} {settings.quote}) is below the exchange minimum "
             f"{rules.min_notional}"

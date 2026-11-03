@@ -37,3 +37,8 @@ def test_rounding_to_exchange_steps():
     assert floor_to(0.123456, 0.001) == 0.123
     assert floor_to(5.9, 1) == 5
     assert round_to(101.236, 0.01) == 101.24
+
+
+def test_rounding_to_odd_ticks():
+    assert round_to(101.13, 0.25) == 101.25
+    assert floor_to(0.0099, 0.005) == 0.005

@@ -109,3 +109,18 @@ def test_rejects_limit_entry_above_price(settings):
 def test_model_rejects_stop_above_long_entry():
     with pytest.raises(ValidationError):
         idea(stop=101)
+
+
+def test_futures_allows_one_trade_per_asset(settings):
+    s = settings.model_copy(update={"market": Market.FUTURES})
+    v = check(
+        idea(horizon="short"), s, book(taken={("BTC", "mid")}), price=100.5, atr=4, rules=RULES
+    )
+    assert any("net per symbol" in r for r in v.reasons)
+
+
+def test_no_equity_rejects():
+    from tradedesk.config import Settings
+
+    v = check(idea(), Settings(), book(equity=0), price=100.5, atr=4, rules=RULES)
+    assert not v.ok

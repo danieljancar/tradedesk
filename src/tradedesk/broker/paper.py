@@ -82,7 +82,7 @@ class PaperBroker:
         fees = (price + position["entry_price"]) * position["qty"] * FEE
         return Exit(price=price, reason=reason, pnl=gross - fees)
 
-    def cancel(self, plan: dict) -> None:
+    def cancel(self, plan: dict) -> Fill | None:
         return None
 
     def close(self, position: dict) -> Exit:

@@ -5,7 +5,8 @@ from pathlib import Path
 from tradedesk import news, risk, snapshot
 from tradedesk.binance import market_data
 from tradedesk.broker import Broker, Fill, make_broker
-from tradedesk.config import Horizon, Settings
+from tradedesk.broker.base import Unprotected
+from tradedesk.config import Horizon, Market, Settings
 from tradedesk.db import Database, now
 from tradedesk.models import PlanFile, TradeIdea
 
@@ -214,6 +215,7 @@ class Desk:
         if verdict.ok:
             book.open_count += 1
             book.open_risk += verdict.risk_amount
+            book.free_quote -= verdict.notional
             book.taken.add((idea.asset, idea.horizon.value))
             title = (
                 f"Passed: {idea.asset} {idea.side} {idea.horizon}, {verdict.qty:g} at "
@@ -356,33 +358,62 @@ class Desk:
 
     def sync(self) -> list[str]:
         out = []
-        ttl = timedelta(hours=self.settings.execution.entry_ttl_hours)
         for plan in self.db.all("SELECT * FROM plans WHERE status = 'placed'"):
-            status = self.broker.entry_status(plan)
-            if isinstance(status, Fill):
-                self._open_position(plan, status)
-                out.append(f"plan {plan['id']} filled at {status.price:g}")
-            elif status == "cancelled":
-                self.db.update("plans", plan["id"], status="cancelled", updated_at=now())
-                out.append(f"plan {plan['id']} cancelled by the exchange")
-            elif datetime.now(UTC) - datetime.fromisoformat(plan["updated_at"]) > ttl:
-                self.broker.cancel(plan)
-                self.db.update("plans", plan["id"], status="expired", updated_at=now())
-                self.log("exchange", "cancel", f"Entry for {plan['asset']} expired unfilled")
-                out.append(f"plan {plan['id']} expired")
+            try:
+                out += self._sync_entry(plan)
+            except Exception as e:
+                self.log("exchange", "error", f"Entry check for plan {plan['id']} failed", str(e))
+                if self.settings.market is Market.FUTURES:
+                    self.db.update(
+                        "plans",
+                        plan["id"],
+                        status="rejected",
+                        reasons=f"exchange: {e}",
+                        updated_at=now(),
+                    )
+                out.append(f"plan {plan['id']}: error, {e}")
         for pos in self.db.open_positions():
-            exit_ = self.broker.exit_status(pos)
-            if exit_:
-                self._close_position(pos, exit_.price, exit_.reason, exit_.pnl)
-                out.append(f"position {pos['id']} closed by {exit_.reason} at {exit_.price:g}")
-                continue
-            max_days = self.settings.hold_days.days(Horizon(pos["horizon"]))
-            held = datetime.now(UTC) - datetime.fromisoformat(pos["opened_at"])
-            if self.settings.execution.close_expired and held > timedelta(days=max_days):
-                self.close(pos["id"], f"held longer than {max_days} days")
-                out.append(f"position {pos['id']} closed, hold time ran out")
+            try:
+                out += self._sync_position(pos)
+            except Unprotected as e:
+                self.log("exchange", "error", f"No working stop on {pos['asset']}", str(e))
+                out.append(f"position {pos['id']}: NO STOP ON THE EXCHANGE, {e}")
+            except Exception as e:
+                self.log("exchange", "error", f"Check on {pos['asset']} failed", str(e))
+                out.append(f"position {pos['id']}: error, {e}")
         self.db.record_equity(self.broker.equity())
         return out
+
+    def _sync_entry(self, plan: dict) -> list[str]:
+        status = self.broker.entry_status(plan)
+        if isinstance(status, Fill):
+            self._open_position(plan, status)
+            return [f"plan {plan['id']} filled at {status.price:g}"]
+        if status == "cancelled":
+            self.db.update("plans", plan["id"], status="cancelled", updated_at=now())
+            return [f"plan {plan['id']} cancelled by the exchange"]
+        ttl = timedelta(hours=self.settings.execution.entry_ttl_hours)
+        if datetime.now(UTC) - datetime.fromisoformat(plan["updated_at"]) <= ttl:
+            return []
+        partial = self.broker.cancel(plan)
+        if partial:
+            self._open_position(plan, partial)
+            return [f"plan {plan['id']} expired part filled, {partial.qty:g} kept with its stop"]
+        self.db.update("plans", plan["id"], status="expired", updated_at=now())
+        self.log("exchange", "cancel", f"Entry for {plan['asset']} expired unfilled")
+        return [f"plan {plan['id']} expired"]
+
+    def _sync_position(self, pos: dict) -> list[str]:
+        exit_ = self.broker.exit_status(pos)
+        if exit_:
+            self._close_position(pos, exit_.price, exit_.reason, exit_.pnl)
+            return [f"position {pos['id']} closed by {exit_.reason} at {exit_.price:g}"]
+        max_days = self.settings.hold_days.days(Horizon(pos["horizon"]))
+        held = datetime.now(UTC) - datetime.fromisoformat(pos["opened_at"])
+        if self.settings.execution.close_expired and held > timedelta(days=max_days):
+            self.close(pos["id"], f"held longer than {max_days} days")
+            return [f"position {pos['id']} closed, hold time ran out"]
+        return []
 
     def _close_position(self, pos: dict, price: float, reason: str, pnl: float | None) -> None:
         sign = 1 if pos["side"] == "long" else -1
@@ -416,8 +447,11 @@ class Desk:
         for plan in self.db.all(
             "SELECT * FROM plans WHERE status IN ('proposed','approved','placed')"
         ):
-            if plan["status"] == "placed":
-                self.broker.cancel(plan)
+            partial = self.broker.cancel(plan) if plan["status"] == "placed" else None
+            if partial:
+                self._open_position(plan, partial)
+                out.append(f"plan {plan['id']} had a partial fill, now a position")
+                continue
             self.db.update("plans", plan["id"], status="cancelled", updated_at=now())
             out.append(f"plan {plan['id']} cancelled")
         if flatten:

@@ -1,5 +1,8 @@
 import json
+import time
 from contextlib import suppress
+
+import httpx
 
 from tradedesk.binance.client import BinanceError, Client
 from tradedesk.binance.market import MarketData, SymbolRules
@@ -55,37 +58,57 @@ class FuturesBroker:
             triggerPrice=trigger,
             closePosition=True,
             workingType="MARK_PRICE",
-            priceProtect=True,
+            priceProtect=kind == "TAKE_PROFIT_MARKET" or None,
         )
         return order["algoId"]
 
-    def _market(self, symbol: str, side: str, qty: float, reduce: bool = False) -> dict:
-        return self.client.signed(
-            "POST",
-            "/fapi/v1/order",
-            symbol=symbol,
-            side=side,
-            type="MARKET",
-            quantity=qty,
-            reduceOnly=reduce or None,
-            newOrderRespType="RESULT",
-        )
+    def _market(
+        self, symbol: str, side: str, qty: float, reduce: bool = False, cid: str | None = None
+    ) -> dict:
+        try:
+            return self.client.signed(
+                "POST",
+                "/fapi/v1/order",
+                symbol=symbol,
+                side=side,
+                type="MARKET",
+                quantity=qty,
+                reduceOnly=reduce or None,
+                newClientOrderId=cid,
+                newOrderRespType="RESULT",
+            )
+        except httpx.HTTPError:
+            if cid is None:
+                raise
+            return self._order(symbol, cid)
+
+    def _order(self, symbol: str, cid: str) -> dict:
+        return self.client.signed("GET", "/fapi/v1/order", symbol=symbol, origClientOrderId=cid)
 
     def _protect(self, symbol: str, side: str, stop: float, target: float) -> dict:
         exit_side = "SELL" if side == "long" else "BUY"
-        return {
-            "stop": self._conditional(symbol, exit_side, "STOP_MARKET", stop),
-            "target": self._conditional(symbol, exit_side, "TAKE_PROFIT_MARKET", target),
-        }
+        refs = {}
+        try:
+            refs["stop"] = self._conditional(symbol, exit_side, "STOP_MARKET", stop)
+            refs["target"] = self._conditional(symbol, exit_side, "TAKE_PROFIT_MARKET", target)
+        except Exception:
+            for algo_id in refs.values():
+                self._cancel_algo(algo_id)
+            raise
+        return refs
 
     def _open(self, plan: dict) -> Placed:
-        symbol, side = plan["symbol"], plan["side"]
+        symbol, side, cid = plan["symbol"], plan["side"], f"desk-{plan['id']}"
         self._prepare(symbol, plan["leverage"] or 1)
-        order = self._market(symbol, "BUY" if side == "long" else "SELL", plan["qty"])
+        order = self._market(symbol, "BUY" if side == "long" else "SELL", plan["qty"], cid=cid)
+        if not float(order.get("executedQty") or 0):
+            order = self._order(symbol, cid)
         fill, qty = float(order["avgPrice"]), float(order["executedQty"])
+        if not qty:
+            raise RuntimeError(f"market order for plan {plan['id']} did not fill")
         try:
             refs = self._protect(symbol, side, plan["stop"], plan["take_profit"])
-        except BinanceError:
+        except Exception:
             self._market(symbol, "SELL" if side == "long" else "BUY", qty, reduce=True)
             raise
         return Placed(open=True, fill_price=fill, qty=qty, refs=refs)
@@ -119,20 +142,37 @@ class FuturesBroker:
         refs = json.loads(position["exchange"])
         for leg in ("stop", "target"):
             self._cancel_algo(refs[leg])
-        trades = self.client.signed(
-            "GET", "/fapi/v1/userTrades", symbol=symbol, startTime=ms(position["opened_at"])
-        )
+        trades = self._trades(symbol, ms(position["opened_at"]))
         exit_side = "SELL" if position["side"] == "long" else "BUY"
         exits = [t for t in trades if t["side"] == exit_side]
         qty = sum(float(t["qty"]) for t in exits)
         price = sum(float(t["price"]) * float(t["qty"]) for t in exits) / qty if qty else 0.0
-        pnl = sum(float(t["realizedPnl"]) - float(t["commission"]) for t in exits)
+        pnl = sum(float(t["realizedPnl"]) for t in exits) - sum(
+            float(t["commission"]) for t in trades
+        )
         reason = (
             "stop"
             if abs(price - position["stop"]) < abs(price - position["take_profit"])
             else "target"
         )
         return Exit(price=price, reason=reason, pnl=pnl)
+
+    def _trades(self, symbol: str, start: int) -> list[dict]:
+        """userTrades covers at most 7 days per call, so walk the window."""
+        week = 7 * 24 * 3600 * 1000 - 1
+        end_all, out = int(time.time() * 1000), []
+        while start <= end_all:
+            end = min(start + week, end_all)
+            out += self.client.signed(
+                "GET",
+                "/fapi/v1/userTrades",
+                symbol=symbol,
+                startTime=start,
+                endTime=end,
+                limit=1000,
+            )
+            start = end + 1
+        return out
 
     def cancel(self, plan: dict) -> None:
         return None
@@ -154,6 +194,14 @@ class FuturesBroker:
     def move_stop(self, position: dict, stop: float) -> dict:
         refs = json.loads(position["exchange"])
         exit_side = "SELL" if position["side"] == "long" else "BUY"
-        new_id = self._conditional(position["symbol"], exit_side, "STOP_MARKET", stop)
-        self._cancel_algo(refs["stop"])
+        try:
+            new_id = self._conditional(position["symbol"], exit_side, "STOP_MARKET", stop)
+            self._cancel_algo(refs["stop"])
+        except BinanceError:
+            self._cancel_algo(refs["stop"])
+            try:
+                new_id = self._conditional(position["symbol"], exit_side, "STOP_MARKET", stop)
+            except Exception:
+                self._conditional(position["symbol"], exit_side, "STOP_MARKET", position["stop"])
+                raise
         return refs | {"stop": new_id}
