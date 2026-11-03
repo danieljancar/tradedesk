@@ -163,8 +163,8 @@ def kill(flatten: bool = False) -> None:
 def journal(days: int = 30) -> None:
     """Closed trades and stats for the review."""
     rows = desk().db.all(
-        "SELECT * FROM positions WHERE status = 'closed' AND closed_at >= date('now', ?) "
-        "ORDER BY closed_at",
+        "SELECT p.*, l.thesis, l.confidence FROM positions p JOIN plans l ON l.id = p.plan_id "
+        "WHERE p.status = 'closed' AND p.closed_at >= date('now', ?) ORDER BY p.closed_at",
         f"-{days} days",
     )
     if not rows:
@@ -177,8 +177,8 @@ def journal(days: int = 30) -> None:
         risk = abs(r["entry_price"] - r["initial_stop"]) * r["qty"]
         r_mult = r["pnl"] / risk if risk else 0
         say(
-            f"{r['closed_at'][:10]} {r['asset']} {r['side']} {r['horizon']} {r['exit_reason']} "
-            f"{r['pnl']:+.2f} ({r_mult:+.1f}R) plan {r['plan_id']}"
+            f"{r['closed_at'][:10]} {r['asset']} {r['side']} {r['horizon']} conf {r['confidence']} "
+            f"{r['exit_reason']} {r['pnl']:+.2f} ({r_mult:+.1f}R) | {r['thesis']}"
         )
 
 
@@ -190,3 +190,18 @@ def serve(port: int = 8420, host: str = "127.0.0.1") -> None:
     from tradedesk.web.app import create_app
 
     uvicorn.run(create_app(desk()), host=host, port=port, log_level="warning")
+
+
+@app.command()
+def demo(port: int = 8421, pause: float = 1.6) -> None:
+    """Replay a made-up run on a separate database to see the trading floor."""
+    import uvicorn
+
+    from tradedesk import demo as replay
+    from tradedesk.web.app import create_app
+
+    s = settings()
+    d = Desk(s, replay.demo_db(s.path(s.db_path).with_name("demo.db")))
+    replay.start(d, pause)
+    say(f"demo on http://127.0.0.1:{port}")
+    uvicorn.run(create_app(d), host="127.0.0.1", port=port, log_level="warning")

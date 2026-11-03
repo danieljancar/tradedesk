@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run desk run:*)",
+      "Bash(uv run desk sync)",
+      "Bash(uv run desk snapshot)",
+      "Bash(uv run desk news)",
+      "Bash(uv run desk book)",
+      "Bash(uv run desk post:*)",
+      "Bash(uv run desk check:*)",
+      "Bash(uv run desk execute)",
+      "Bash(uv run desk status)",
+      "Bash(uv run desk plans:*)",
+      "Bash(uv run desk journal:*)",
+      "Read(runs/**)",
+      "Read(lessons.md)",
+      "Edit(runs/**)",
+      "Edit(lessons.md)",
+      "WebSearch"
+    ],
+    "deny": [
+      "Bash(uv run desk approve:*)",
+      "Read(.env)",
+      "Read(desk.toml)",
+      "Edit(desk.toml)",
+      "Edit(src/tradedesk/risk.py)",
+      "Edit(src/tradedesk/config.py)"
+    ]
+  }
+}
