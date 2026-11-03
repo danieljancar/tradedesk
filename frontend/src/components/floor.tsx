@@ -144,7 +144,7 @@ export function Floor({ runId, finished, events, fresh, onPick, hideSteps = fals
     for (const s of STEPS) {
       const moods = s.actors.map((x) => rig.current?.get(x)?.dataset.mood);
       out[s.id] = moods.includes("working") ? "now"
-        : moods.every((m) => m === "done" || m === "alert" || (finished && m === "awake")) && moods.some((m) => m !== "awake") ? "done"
+        : (finished ? moods.some((m) => m === "done" || m === "alert") : moods.every((m) => m === "done" || m === "alert")) ? "done"
           : moods.some((m) => m === "done") ? "now" : "";
     }
     setSteps(out);

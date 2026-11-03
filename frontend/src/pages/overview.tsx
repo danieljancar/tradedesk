@@ -30,8 +30,8 @@ export default function Overview() {
     <Page>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
-          <section className="grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
-            <div className="bg-panel p-4 sm:col-span-2 lg:col-span-1">
+          <section className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
+            <div className="col-span-2 bg-panel p-4 lg:col-span-1">
               <p className="text-xs font-medium text-dim">Macro backdrop for crypto</p>
               <p className={cn("font-heading text-3xl font-semibold", tone)}>{r?.label ?? "Loading"}</p>
               {r && (
@@ -42,7 +42,7 @@ export default function Overview() {
                     <span className="bg-down" style={{ width: `${(r.headwinds / r.total) * 100}%` }} />
                   </div>
                   <p className="mt-2 text-[13px] leading-snug text-dim">
-                    {r.tailwinds} of {r.total} drivers help crypto right now, {r.headwinds} work against it. Hover a card to see why.
+                    {r.tailwinds} of {r.total} drivers help crypto right now, {r.headwinds} work against it. Hover or tap a card to see why.
                   </p>
                 </>
               )}
@@ -80,7 +80,7 @@ export default function Overview() {
               <Avatar id="pm" size={52} mood={live ? "working" : pm ? "done" : "idle"} />
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-dim">{live ? "Working right now" : latest ? `Last run ${new Date(latest.started_at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })}` : "No runs yet"}</p>
-                <p className="truncate font-heading text-lg font-semibold">{pm ? pm.title.replace(/^Decision\s*/i, "").replace(/^\d{4}-\d\d-\d\d:?\s*/, "") || "Decision ready" : live ? "Thinking" : "No call yet"}</p>
+                <p className="line-clamp-2 text-[15px] leading-snug font-semibold">{live ? "Working on it" : latest?.summary ? latest.summary.split("\n")[0] : pm ? "Decision ready" : "No call yet"}</p>
               </div>
               <Button size="sm" onClick={d.runNow} disabled={live} className="gap-1.5"><Play className="size-3.5" />Run</Button>
             </div>

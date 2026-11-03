@@ -47,7 +47,7 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
           <Avatar id="bull" size={30} mood="awake" />
           <div>
             <p className="font-heading text-[15px] leading-none font-bold tracking-tight">tradedesk</p>
-            <p className="mt-1 text-[10px] font-semibold tracking-wider text-dim uppercase">{d.state ? `${d.state.mode} · ${d.state.market}` : ""}</p>
+            <p className="mt-1 text-[10px] font-semibold tracking-wider text-dim uppercase">{d.state ? `${d.state.mode} ${d.state.market}` : ""}</p>
           </div>
         </div>
         <nav className="flex-1 space-y-0.5 px-2 py-2" aria-label="Pages">

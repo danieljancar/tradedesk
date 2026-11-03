@@ -51,7 +51,7 @@ export function DriverCard({ d }: { d: Driver }) {
             <span className="font-mono text-lg font-medium tabular-nums">{fmt(d)}</span>
             <span className="font-mono text-xs tabular-nums">
               <span className={cn(d.change_1w == null ? "text-dim" : d.change_1w >= 0 ? "text-up" : "text-down")}>{pc(d.change_1w)}</span>
-              <span className="text-dim"> 1w · </span>
+              <span className="mr-2 text-dim"> 1w</span>
               <span className={cn(ch == null ? "text-dim" : ch >= 0 ? "text-up" : "text-down")}>{pc(ch)}</span>
               <span className="text-dim"> 1m</span>
             </span>

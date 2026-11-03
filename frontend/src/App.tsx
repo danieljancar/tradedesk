@@ -46,7 +46,7 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Shell>
-            <Toaster position="bottom-right" theme={dark ? "dark" : "light"} />
+            <Toaster position="top-center" theme={dark ? "dark" : "light"} />
           </TermLayer>
         </DeskProvider>
       </TooltipProvider>

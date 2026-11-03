@@ -34,9 +34,11 @@ export default function Learn() {
   useEffect(() => { api<any>("/api/learning").then(setStats).catch(() => setStats(null)); }, []);
   const items = useMemo(() => Object.entries(GLOSSARY).sort((a, b) => a[1].term.localeCompare(b[1].term)), []);
   const shown = items.filter(([, g]) => !q || `${g.term} ${g.short} ${g.long ?? ""}`.toLowerCase().includes(q.toLowerCase()));
-  const tables = stats && typeof stats === "object"
-    ? Object.entries(stats).filter(([, v]) => Array.isArray(v) && (v as any[]).length && typeof (v as any[])[0] === "object") as [string, any[]][]
+  const GROUPS: [string, string][] = [["by_confidence", "By confidence"], ["by_side", "Long vs short"], ["by_asset", "By coin"], ["by_horizon", "By horizon"], ["by_decision", "Taken, passed, rejected"]];
+  const tables: [string, any[]][] = stats
+    ? GROUPS.filter(([k]) => stats[k] && Object.keys(stats[k]).length).map(([k, label]) => [label, Object.entries(stats[k]).map(([g, v]: [string, any]) => ({ group: g, ...v }))])
     : [];
+  const resolved = stats?.ideas?.filled_and_resolved ?? 0;
 
   return (
     <Page>
@@ -65,8 +67,19 @@ export default function Learn() {
                 After about ten resolved ideas per group, this shows which confidence levels, coins and sides actually work, and the weekly review turns that into lessons the desk reads before every decision.
               </p>
             )}
-            {tables.length > 0 && <div className="space-y-4">{tables.map(([k, rows]) => <StatTable key={k} title={k.replace(/_/g, " ")} rows={rows} />)}</div>}
-            {stats && !tables.length && <pre className="max-h-96 overflow-auto rounded-md bg-sunk p-3 text-xs">{JSON.stringify(stats, null, 2)}</pre>}
+            {stats && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[["Ideas", stats.ideas?.total ?? 0], ["Resolved", resolved], ["Needed per group", stats.min_sample ?? 10]].map(([k, v]) => (
+                    <div key={k as string} className="rounded-lg bg-sunk px-2 py-2"><p className="font-mono text-xl">{v}</p><p className="text-[11px] text-dim">{k}</p></div>
+                  ))}
+                </div>
+                {stats.overall?.enough
+                  ? <p className="text-sm">Overall: <b>{Math.round(stats.overall.hit_rate * 100)}%</b> of resolved ideas worked, average <b className={stats.overall.avg_r >= 0 ? "text-up" : "text-down"}>{stats.overall.avg_r.toFixed(2)}R</b> (n {stats.overall.n}).</p>
+                  : <p className="text-[13px] leading-relaxed text-dim">Collecting data. Every idea, taken or not, is replayed on real candles once it resolves. Groups need {stats.min_sample ?? 10} resolved ideas before they count; greyed rows below are still too small to trust.</p>}
+                {tables.map(([k, rows]) => <StatTable key={k} title={k} rows={rows} />)}
+              </div>
+            )}
           </Box>
           <Box title="How a run works">
             <ol className="list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed">

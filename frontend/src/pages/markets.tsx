@@ -138,7 +138,7 @@ export default function Markets() {
                   <div><dt className="text-dim"><Term k="atr">ATR 1d</Term></dt><dd className="font-mono">{f.frames["1d"]?.atr_pct?.toFixed(1)}%</dd></div>
                   <div><dt className="text-dim"><Term k="funding">Funding</Term></dt><dd className="font-mono">{f.derivatives ? `${f.derivatives.funding_pct.toFixed(4)}%` : "–"}</dd></div>
                   <div><dt className="text-dim"><Term k="longshort">Long/short</Term></dt><dd className="font-mono">{f.derivatives?.long_short_ratio?.toFixed(2) ?? "–"}</dd></div>
-                  <div><dt className="text-dim">7d · 30d</dt><dd className="font-mono"><span className={f.change?.["7d"] >= 0 ? "text-up" : "text-down"}>{pc(f.change?.["7d"])}</span> <span className={f.change?.["30d"] >= 0 ? "text-up" : "text-down"}>{pc(f.change?.["30d"])}</span></dd></div>
+                  <div><dt className="text-dim">7 days, 30 days</dt><dd className="font-mono"><span className={f.change?.["7d"] >= 0 ? "text-up" : "text-down"}>{pc(f.change?.["7d"])}</span> <span className={f.change?.["30d"] >= 0 ? "text-up" : "text-down"}>{pc(f.change?.["30d"])}</span></dd></div>
                 </dl>
               )}
               {hover && (
@@ -186,7 +186,7 @@ export default function Markets() {
             <Box title={`Plans and trades on ${asset}`}>
               {!plans.length && !open.length && !closed.length && <p className="text-sm text-dim">Nothing yet on {asset}.</p>}
               <ul className="space-y-2 text-[13px]">
-                {open.map((p) => <li key={`o${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> open at {px(p.entry_price)}</span><span className="font-mono text-dim">stop {px(p.stop)} · target {px(p.take_profit)}</span></li>)}
+                {open.map((p) => <li key={`o${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> open at {px(p.entry_price)}</span><span className="font-mono text-dim">stop {px(p.stop)}, target {px(p.take_profit)}</span></li>)}
                 {plans.slice(0, 6).map((p) => <li key={`p${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> plan, {p.status}</span><span className="font-mono text-dim">{px(p.entry)} / {px(p.stop)} / {px(p.take_profit)}</span></li>)}
                 {closed.slice(0, 5).map((p) => <li key={`c${p.id}`} className="flex justify-between gap-2"><span>{p.side} closed, {p.exit_reason}</span><span className={cn("font-mono", p.pnl >= 0 ? "text-up" : "text-down")}>{p.pnl >= 0 ? "+" : ""}{Number(p.pnl).toFixed(2)}</span></li>)}
               </ul>
