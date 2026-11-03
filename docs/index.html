@@ -3,142 +3,459 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tradedesk</title>
-<meta name="description" content="A small crypto desk that runs on your own machine. Agents argue, a plain Python risk engine decides, Binance holds the stop. A hobby project.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%23a6e3b8%22/%3E%3Ccircle cx=%2211%22 cy=%2214%22 r=%222.5%22/%3E%3Ccircle cx=%2221%22 cy=%2214%22 r=%222.5%22/%3E%3Cpath d=%22M11 20q5 4 10 0%22 stroke=%22black%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/svg%3E">
+<title>tradedesk: AI agents argue, plain code decides</title>
+<meta name="description" content="An open-source crypto trading desk that runs on your own machine. Claude Code agents argue about the market, a plain Python risk engine sizes every trade at 1% risk and can veto it, and Binance holds the stop. Paper mode by default.">
+<meta name="color-scheme" content="dark light">
+<meta property="og:title" content="tradedesk">
+<meta property="og:description" content="AI agents argue about the market. A plain Python risk engine decides what you can lose. Open source, runs locally, paper mode by default.">
+<meta property="og:image" content="https://danieljancar.github.io/tradedesk/overview.webp">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%2334d399%22/%3E%3Ccircle cx=%2211%22 cy=%2214%22 r=%222.5%22/%3E%3Ccircle cx=%2221%22 cy=%2214%22 r=%222.5%22/%3E%3Cpath d=%22M11 20q5 4 10 0%22 stroke=%22black%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/svg%3E">
 <style>
   :root {
-    --bg: #f7f3ec;
-    --card: #fffdf9;
-    --ink: #1f1d1a;
-    --muted: #6b665e;
-    --line: #e4ddd1;
-    --accent: #1f7a4d;
-    --warn-bg: #fbeee4;
-    --warn-line: #e9c7ad;
-    --code-bg: #efe9df;
+    --bg: #0b0d10;
+    --bg-2: #111419;
+    --card: #14181e;
+    --ink: #eef1f4;
+    --ink-2: #b4bcc6;
+    --muted: #7d8794;
+    --line: #232932;
+    --line-2: #2e3540;
+    --accent: #34d399;
+    --accent-ink: #04140d;
+    --accent-soft: rgba(52, 211, 153, 0.12);
+    --red: #f87171;
+    --code-bg: #0f1216;
+    --shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--line-2);
+    --glow: radial-gradient(60% 50% at 50% 0%, rgba(52, 211, 153, 0.14), transparent 70%);
   }
-  @media (prefers-color-scheme: dark) {
+  @media (prefers-color-scheme: light) {
     :root {
-      --bg: #1b1a18;
-      --card: #23221f;
-      --ink: #ece7de;
-      --muted: #a39d92;
-      --line: #36332e;
-      --accent: #7fd1a3;
-      --warn-bg: #2e241d;
-      --warn-line: #5a4232;
-      --code-bg: #2b2925;
+      --bg: #f8f9fb;
+      --bg-2: #ffffff;
+      --card: #ffffff;
+      --ink: #0f1419;
+      --ink-2: #3a4450;
+      --muted: #66707c;
+      --line: #e3e7ec;
+      --line-2: #d3d9e0;
+      --accent: #059669;
+      --accent-ink: #ffffff;
+      --accent-soft: rgba(5, 150, 105, 0.09);
+      --red: #dc2626;
+      --code-bg: #0f1216;
+      --shadow: 0 30px 70px -25px rgba(15, 20, 25, 0.35), 0 0 0 1px var(--line-2);
+      --glow: radial-gradient(60% 50% at 50% 0%, rgba(5, 150, 105, 0.10), transparent 70%);
     }
   }
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow-x: hidden;
   }
-  main { max-width: 720px; margin: 0 auto; padding: 48px 16px 64px; }
-  header { margin-bottom: 32px; }
-  h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.01em; }
-  h2 { font-size: 19px; margin: 40px 0 8px; }
-  p, li { color: var(--ink); }
-  .lede { font-size: 19px; color: var(--muted); margin: 0; }
-  a { color: var(--accent); }
-  nav { margin-top: 16px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 15px; }
-  figure { margin: 32px 0 8px; }
-  figure img {
-    width: 100%; height: auto; display: block;
-    border: 1px solid var(--line); border-radius: 12px; background: #f7f3ec;
+  a { color: var(--accent); text-underline-offset: 3px; }
+  img { max-width: 100%; height: auto; display: block; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 16px; }
+  @media (min-width: 720px) { .wrap { padding: 0 32px; } }
+  .narrow { max-width: 760px; }
+
+  /* top bar */
+  .top {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: saturate(160%) blur(12px);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid var(--line);
   }
-  figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; }
-  ol, ul { padding-left: 22px; }
-  li { margin: 6px 0; }
-  code, pre { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
-  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
-  pre {
-    background: var(--code-bg); padding: 14px 16px; border-radius: 8px;
-    overflow-x: auto; margin: 12px 0;
+  .top .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; color: var(--ink); text-decoration: none; font-size: 17px; }
+  .brand svg { width: 26px; height: 26px; }
+  .top nav { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
+  .top nav a { color: var(--ink-2); text-decoration: none; }
+  .top nav a:hover { color: var(--ink); }
+  @media (max-width: 720px) { .top nav { display: none; } .top .btn { margin-left: auto; } }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 20px; border-radius: 10px;
+    font-weight: 600; font-size: 16px; text-decoration: none;
+    background: var(--accent); color: var(--accent-ink);
+    border: 1px solid transparent;
+    transition: transform .12s ease, filter .12s ease;
   }
-  pre code { background: none; padding: 0; }
-  .note {
-    background: var(--warn-bg); border: 1px solid var(--warn-line);
-    border-radius: 10px; padding: 14px 16px; margin: 24px 0;
+  .btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+  .btn svg { width: 20px; height: 20px; flex: none; }
+  .btn.small { padding: 8px 14px; font-size: 14px; border-radius: 8px; }
+  .btn.small svg { width: 16px; height: 16px; }
+
+  /* hero */
+  .hero { position: relative; padding: 72px 0 0; text-align: center; }
+  .hero::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 640px; background: var(--glow); pointer-events: none; }
+  .eyebrow {
+    display: inline-block; font-size: 14px; color: var(--ink-2);
+    border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 14px; margin-bottom: 24px;
+    background: var(--bg-2);
   }
-  .note p { margin: 0; }
-  .legal { font-size: 15px; color: var(--muted); }
-  .legal p, .legal li { color: var(--muted); }
-  footer {
-    margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line);
-    font-size: 14px; color: var(--muted);
+  h1 {
+    font-size: clamp(36px, 6.2vw, 68px); line-height: 1.04; letter-spacing: -0.035em;
+    margin: 0 auto 22px; max-width: 900px; font-weight: 750;
   }
+  h1 span { color: var(--accent); }
+  .lede { font-size: clamp(18px, 2.2vw, 21px); color: var(--ink-2); max-width: 700px; margin: 0 auto 32px; line-height: 1.55; }
+  .cta-row { display: flex; gap: 14px 22px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .cta-row .alt { color: var(--ink-2); text-decoration: none; font-weight: 500; }
+  .cta-row .alt:hover { color: var(--ink); }
+  .reassure { font-size: 14px; color: var(--muted); margin: 18px 0 0; }
+
+  .shot {
+    margin: 56px auto 0; border-radius: 14px; overflow: hidden;
+    box-shadow: var(--shadow); background: #0d1014;
+  }
+  .shot img { width: 100%; }
+  .hero .shot { max-width: 1160px; }
+  .caption { font-size: 14px; color: var(--muted); margin: 14px auto 0; max-width: 760px; text-align: center; }
+
+  /* numbers */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 72px 0 0; }
+  .stat { background: var(--bg-2); padding: 24px 22px; }
+  .stat b { display: block; font-size: 34px; line-height: 1.1; letter-spacing: -0.02em; font-weight: 700; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--ink-2); font-size: 15px; line-height: 1.45; display: block; }
+  @media (max-width: 860px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 420px) { .stat { padding: 18px 16px; } .stat b { font-size: 28px; } .stat span { font-size: 14px; } }
+
+  /* sections */
+  section { padding: 104px 0 0; }
+  .kicker { font-size: 13px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 12px; }
+  h1, h2 { text-wrap: balance; }
+  .lede, .sub, .caption { text-wrap: pretty; }
+  h2 { font-size: clamp(28px, 4vw, 42px); line-height: 1.12; letter-spacing: -0.025em; margin: 0 0 16px; font-weight: 720; }
+  h3 { font-size: 19px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .sub { font-size: 19px; color: var(--ink-2); margin: 0 0 40px; max-width: 680px; }
+  p { margin: 0 0 14px; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+  .split.setup { grid-template-columns: 5fr 7fr; align-items: center; }
+  .split.how { grid-template-columns: 5fr 7fr; }
+  .split.how .shot { position: sticky; top: 92px; }
+  @media (max-width: 900px) { .split, .split.setup, .split.how { grid-template-columns: 1fr; gap: 32px; } .split.how .shot { position: static; } }
+
+  ol.steps { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+  ol.steps li { counter-increment: s; position: relative; padding: 0 0 22px 48px; color: var(--ink-2); }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0;
+    width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+    font-size: 14px; font-weight: 700; color: var(--accent); background: var(--accent-soft);
+  }
+  ol.steps li b { color: var(--ink); display: block; font-weight: 650; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+  .card p { color: var(--ink-2); margin: 0; font-size: 16px; }
+
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .compare { grid-template-columns: 1fr; } }
+  .compare .card h3 { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .compare ul { margin: 0; padding: 0; list-style: none; }
+  .compare li { padding: 9px 0; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 16px; }
+  .compare li:first-child { border-top: 0; }
+  .tag { font-size: 12px; font-weight: 650; border-radius: 6px; padding: 2px 8px; letter-spacing: 0.02em; }
+  .tag.ai { background: rgba(167, 139, 250, 0.15); color: #a78bfa; }
+  .tag.code { background: var(--accent-soft); color: var(--accent); }
+
+  .warn {
+    border: 1px solid color-mix(in srgb, var(--red) 40%, var(--line));
+    background: color-mix(in srgb, var(--red) 7%, var(--bg-2));
+    border-radius: 14px; padding: 22px 24px; margin: 0 0 32px;
+  }
+  .warn p { margin: 0; color: var(--ink); }
+
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; margin: 0; padding: 0; list-style: none; }
+  @media (max-width: 760px) { .rules { grid-template-columns: 1fr; } }
+  .rules li { padding: 14px 0 14px 32px; border-top: 1px solid var(--line); position: relative; color: var(--ink-2); }
+  .rules li b { color: var(--ink); font-weight: 650; }
+  .rules li::before {
+    content: ""; position: absolute; left: 2px; top: 20px; width: 14px; height: 8px;
+    border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg);
+  }
+
+  .shot.inline { margin: 0; }
+  .features { margin-top: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+  @media (max-width: 900px) { .features { grid-template-columns: 1fr; gap: 20px; } }
+  .features p { color: var(--ink-2); font-size: 16px; margin: 0; }
+
+  /* setup */
+  .term { background: var(--code-bg); border: 1px solid var(--line-2); border-radius: 14px; overflow: hidden; }
+  .term-bar { display: flex; gap: 7px; padding: 12px 16px; border-bottom: 1px solid #222831; }
+  .term-bar i { width: 11px; height: 11px; border-radius: 50%; background: #2c333d; display: block; }
+  .term pre { margin: 0; padding: 20px; overflow-x: auto; font-size: 14px; line-height: 1.85; color: #e6eaee; }
+  .term .c { color: #6f7a87; }
+  .term .p { color: #34d399; user-select: none; }
+  @media (max-width: 520px) {
+    .term pre { font-size: 12.5px; padding: 16px; }
+    .term .c { display: none; }
+    .eyebrow { font-size: 13px; padding: 5px 12px; }
+    .hero { padding-top: 48px; }
+  }
+  p code, li code, dd code { background: var(--accent-soft); color: var(--ink); padding: 1px 6px; border-radius: 5px; font-size: 0.88em; }
+
+  /* faq */
+  .faq details { border-top: 1px solid var(--line); }
+  .faq details:last-child { border-bottom: 1px solid var(--line); }
+  .faq summary {
+    cursor: pointer; list-style: none; padding: 20px 40px 20px 0; position: relative;
+    font-size: 18px; font-weight: 620;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after {
+    content: ""; position: absolute; right: 6px; top: 27px; width: 9px; height: 9px;
+    border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg);
+    transition: transform .15s ease;
+  }
+  .faq details[open] summary::after { transform: rotate(-135deg); top: 31px; }
+  .faq .a { padding: 0 0 20px; color: var(--ink-2); }
+  .faq .a p:last-child { margin: 0; }
+
+  /* closing */
+  .closing { text-align: center; padding: 120px 0 0; }
+  .closing .sub { margin: 0 auto 32px; }
+
+  .legal { margin-top: 120px; padding: 40px 0 0; border-top: 1px solid var(--line); }
+  .legal h2 { font-size: 22px; letter-spacing: -0.01em; }
+  .legal p, .legal li { color: var(--muted); font-size: 15px; }
+  .legal ul { padding-left: 20px; margin: 0 0 14px; }
+  .legal li { margin: 8px 0; }
+
+  footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; gap: 12px 24px; flex-wrap: wrap; justify-content: space-between; }
+  footer a { color: var(--ink-2); }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>tradedesk</h1>
-    <p class="lede">A small crypto desk that runs on your own laptop. A few Claude Code agents read the market each morning and argue about it. A risk engine written in plain Python decides what's allowed and how big. Binance holds the stop.</p>
-    <nav>
-      <a href="https://github.com/danieljancar/tradedesk">Source on GitHub</a>
-      <a href="#setup">Setup</a>
-      <a href="#legal">Disclaimer</a>
-    </nav>
-  </header>
 
-  <div class="note">
-    <p>I build this in my spare time. It's not a product or a service, and it isn't financial advice. Use paper mode. If you trade real money with it, that's your call and your risk.</p>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#34d399"/><circle cx="11" cy="14" r="2.5" fill="#04140d"/><circle cx="21" cy="14" r="2.5" fill="#04140d"/><path d="M11 20q5 4 10 0" stroke="#04140d" stroke-width="2" fill="none"/></svg>
+      tradedesk
+    </a>
+    <nav aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#safety">Safety</a>
+      <a href="#setup">Setup</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn small" href="https://github.com/danieljancar/tradedesk">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <span class="eyebrow">Open source under MIT. Runs on your own machine.</span>
+      <h1>AI agents argue about the trade. <span>Plain code decides what you can lose.</span></h1>
+      <p class="lede">tradedesk is a crypto trading desk on your laptop. Claude Code agents read the charts and the news and argue for and against each idea. A short Python risk engine sizes every trade so a stop-out costs 1% of your account, and throws out the ones that break a rule. Binance holds the stop from the first second.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://github.com/danieljancar/tradedesk">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          Get it on GitHub
+        </a>
+        <a class="alt" href="#setup">Set up in 4 commands</a>
+      </div>
+      <p class="reassure">Starts in paper mode. No exchange account or API keys needed to try it.</p>
+
+      <figure class="shot">
+        <img src="overview.webp" width="2400" height="1428" alt="The tradedesk dashboard. A macro regime panel reads Risk-off, with tiles for the S&amp;P 500, Nasdaq, US dollar, 10-year yield, yield curve, VIX, oil, Fed balance sheet and stablecoin supply, each marked as a headwind or tailwind for crypto. On the right are account equity, BTC signals and the progress of today's run. Below are positions and a news feed." fetchpriority="high">
+      </figure>
+      <p class="caption">The overview tab during a paper run. Nine macro series, each marked as a tailwind or headwind for crypto, before any agent says a word.</p>
+    </div>
   </div>
 
-  <figure>
-    <img src="floor.webp" alt="The local dashboard during a run: price, headline and book inputs feed a technical and a news analyst, then a bull and a bear, then the portfolio manager, the risk engine and the exchange." width="960" height="720">
-    <figcaption>The dashboard during a demo run. Click any of them to read what they wrote.</figcaption>
-  </figure>
+  <div class="wrap">
+    <div class="stats" role="list">
+      <div class="stat" role="listitem"><b>1%</b><span>of equity at risk per trade by default. The code sets the size, never the model.</span></div>
+      <div class="stat" role="listitem"><b>2&times;</b><span>minimum reward to risk. An idea that can't make twice what it risks is rejected.</span></div>
+      <div class="stat" role="listitem"><b>0 s</b><span>without a stop. It sits on the exchange from the moment the position opens.</span></div>
+      <div class="stat" role="listitem"><b>0 keys</b><span>needed for paper mode. Fills are simulated on live Binance prices.</span></div>
+    </div>
+  </div>
 
-  <h2>What happens in a day</h2>
-  <ol>
-    <li>The desk pulls candles, funding and open interest from Binance, plus the last 36 hours of headlines, and writes them into short text files.</li>
-    <li>A technical analyst and a news analyst each read their part.</li>
-    <li>A bull and a bear read both reports and make their case. One round, 200 words each.</li>
-    <li>A portfolio manager weighs them and writes trade ideas with entry, stop and target. Passing is a valid answer.</li>
-    <li>The risk engine sizes each idea so a stop-out costs 1% of equity, and throws out anything that breaks a rule.</li>
-    <li>What's left waits for you to approve it. Nothing goes out on its own unless you turn that on.</li>
-  </ol>
-
-  <h2>What it won't do</h2>
-  <ul>
-    <li>Open a position without a stop already on the exchange.</li>
-    <li>Let the agents pick the size, approve trades, edit the risk code or read your API keys.</li>
-    <li>Move a stop against you.</li>
-    <li>Make you money. It's a way to run a process and keep a journal of it.</li>
-  </ul>
-
-  <h2 id="setup">Setup</h2>
-  <p>You need <a href="https://docs.astral.sh/uv/">uv</a> and <a href="https://code.claude.com">Claude Code</a>. Paper mode needs no keys.</p>
-<pre><code>git clone https://github.com/danieljancar/tradedesk.git
-cd tradedesk
-uv sync
-cp desk.example.toml desk.toml
-uv run desk serve      # dashboard on 127.0.0.1:8420
-claude                 # then type /daily</code></pre>
-  <p>Just want to look? <code>uv run desk demo</code> replays a made-up run. The <a href="https://github.com/danieljancar/tradedesk#readme">README</a> covers everything else.</p>
-
-  <section id="legal" class="legal">
-    <h2>Disclaimer</h2>
-    <p>tradedesk is a hobby project, shared as is under the <a href="https://github.com/danieljancar/tradedesk/blob/master/LICENSE">MIT license</a>.</p>
-    <ul>
-      <li>Nothing here or in the software is financial, investment, tax or legal advice. The agents' output is generated text and can be wrong.</li>
-      <li>There is no warranty of any kind. The software may have bugs, the exchange may behave differently than expected, and orders may fail, fill badly or not at all.</li>
-      <li>I'm not responsible for any loss, missed gain or other damage that comes from using it, to the extent the law allows. You run it on your own machine with your own keys and your own money.</li>
-      <li>Trading crypto, and especially with leverage, can lose you more than you expect. Check that it's legal where you live.</li>
-      <li>This project isn't affiliated with or endorsed by Binance, Anthropic or any news source it reads.</li>
-    </ul>
+  <section id="how">
+    <div class="wrap">
+      <p class="kicker">How a day runs</p>
+      <h2>Five roles, one round of debate, and a veto.</h2>
+      <p class="sub">You type <code>/daily</code> in Claude Code, or let cron do it. One pass takes a few minutes and leaves a folder of short text files you can read afterwards.</p>
+      <div class="split how">
+        <ol class="steps">
+          <li><b>The desk collects data.</b>4h, daily and weekly candles, funding and open interest from Binance. Headlines from the last 36 hours. Your equity, open positions and lessons from past trades.</li>
+          <li><b>Two analysts read their part.</b>The technical analyst sees only the numbers. The news analyst sees only the headlines and the macro calendar.</li>
+          <li><b>A bull and a bear make their case.</b>Both read both reports. One round, 200 words each.</li>
+          <li><b>The portfolio manager decides.</b>It writes ideas with entry, stop, target and horizon. Passing is a valid answer, and a common one.</li>
+          <li><b>The risk engine checks every idea.</b>It sizes the trade and rejects anything that breaks a rule. No appeal.</li>
+          <li><b>You approve or reject.</b>What passes waits in the dashboard. Approving sends it to Binance with the stop attached.</li>
+        </ol>
+        <figure class="shot inline">
+          <img src="desk.webp" width="2400" height="1428" loading="lazy" alt="The Desk tab: data sources feed a technical and a news analyst, then a bull and a bear, then the portfolio manager, then the risk engine and the exchange. Every step shows done." >
+        </figure>
+      </div>
+    </div>
   </section>
 
-  <footer>
-    Made by <a href="https://github.com/danieljancar">Daniel Jancar</a> on evenings and weekends.
-  </footer>
+  <section>
+    <div class="wrap">
+      <p class="kicker">Who does what</p>
+      <h2>The model writes opinions. It never touches the numbers that cost money.</h2>
+      <p class="sub">Language models are good at reading and arguing and bad at arithmetic they care about. So the split is strict.</p>
+      <div class="compare">
+        <div class="card">
+          <h3><span class="tag ai">AI</span> The agents</h3>
+          <ul>
+            <li>Read the snapshot and the headlines</li>
+            <li>Argue for and against a trade</li>
+            <li>Propose entry, stop, target and horizon</li>
+            <li>Rewrite <code>lessons.md</code> once a week from closed trades</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="tag code">Code</span> The risk engine and you</h3>
+          <ul>
+            <li>Position size, leverage and whether a trade passes</li>
+            <li>Every price checked against the market before an order goes out</li>
+            <li>Approval of each trade, unless you turn on auto-execute</li>
+            <li>Your API key, which the agents are blocked from reading</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="safety">
+    <div class="wrap">
+      <p class="kicker">Safety</p>
+      <h2>Built for the day it goes wrong.</h2>
+      <div class="warn"><p>Most people who trade with leverage lose money. tradedesk will not change that. What it does is cap how much a single bad idea, a crashed laptop or an overconfident model can cost you.</p></div>
+      <ul class="rules">
+        <li><b>Stop on the exchange first.</b> On spot, entry, stop and target go out as one order list. If a stop can't be placed on futures, the position is closed at once.</li>
+        <li><b>Your laptop can be off.</b> Because Binance holds the stop, a failed run or a dead battery doesn't leave a position open without one.</li>
+        <li><b>Stops only move your way.</b> Nothing in the code can widen a stop against you.</li>
+        <li><b>A bad day ends the day.</b> After a 3% daily loss there are no new trades until the next UTC day.</li>
+        <li><b>A bad month ends trading.</b> At 15% drawdown the desk stops opening positions until equity recovers.</li>
+        <li><b>Limits on everything open.</b> At most 4 positions, 4% total risk across all stops, 3x leverage on futures.</li>
+        <li><b>No stops that are just noise.</b> A stop closer than half an ATR to the entry is rejected.</li>
+        <li><b>One command to get out.</b> <code>desk kill --flatten</code> cancels every order and closes every position.</li>
+      </ul>
+      <p style="margin-top:24px;color:var(--muted);font-size:15px">All numbers are defaults in <code>desk.example.toml</code>. You can change them. The agents can't.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="kicker">The dashboard</p>
+      <h2>See the market, the argument and the result in one place.</h2>
+      <p class="sub">A local web page on <code>127.0.0.1:8420</code>. Nothing is hosted anywhere.</p>
+      <figure class="shot inline">
+        <img src="chart.webp" width="2400" height="1428" loading="lazy" alt="The Chart tab: a daily BTC/USDT candlestick chart with two EMAs, volume bars and support and resistance levels marked on the right axis, next to the account and signals panel.">
+      </figure>
+      <div class="features">
+        <div><h3>Macro regime</h3><p>S&amp;P 500, Nasdaq, dollar, 10-year yield, yield curve, VIX, oil, the Fed balance sheet and stablecoin supply, summed up as risk-on or risk-off.</p></div>
+        <div><h3>Charts, news and plans</h3><p>Candles with the levels the analyst used, headlines sorted by asset, and every plan with its entry, stop, target and size.</p></div>
+        <div><h3>An honest report</h3><p>Every idea is replayed on real 1h candles, including the ones you rejected and the ones the risk engine threw out. You see whether the process works before you pay for it.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="setup">
+    <div class="wrap">
+      <div class="split setup">
+        <div>
+          <p class="kicker">Setup</p>
+          <h2>Four commands to a running desk.</h2>
+          <p class="sub" style="margin-bottom:20px">You need <a href="https://docs.astral.sh/uv/">uv</a> and <a href="https://code.claude.com">Claude Code</a>. Paper mode works without a Binance account.</p>
+          <p style="color:var(--ink-2)">Want to look first? <code>uv run desk demo</code> replays a made-up run on a separate database.</p>
+          <p style="color:var(--ink-2)">For testnet or live trading, put a Binance API key in <code>.env</code>. Give it trading permission only, turn withdrawals off and restrict it to your IP. The <a href="https://github.com/danieljancar/tradedesk#readme">README</a> covers the rest.</p>
+        </div>
+        <div class="term">
+          <div class="term-bar"><i></i><i></i><i></i></div>
+<pre><code><span class="p">$ </span>git clone https://github.com/danieljancar/tradedesk
+<span class="p">$ </span>cd tradedesk &amp;&amp; uv sync
+<span class="p">$ </span>uv run desk serve   <span class="c"># dashboard on 127.0.0.1:8420</span>
+<span class="p">$ </span>claude              <span class="c"># then type /daily</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap narrow">
+      <p class="kicker">Questions</p>
+      <h2>Before you try it</h2>
+      <div class="faq">
+        <details>
+          <summary>Is this financial advice?</summary>
+          <div class="a"><p>No. The agents produce generated text and they can be wrong, confidently. tradedesk is a tool for running and recording your own process. Every decision to trade is yours.</p></div>
+        </details>
+        <details>
+          <summary>Does it make money?</summary>
+          <div class="a"><p>There's no promise that it does, and you should assume it doesn't until your own numbers say otherwise. The report replays every idea on real candles so you can measure that in paper mode, without risking anything.</p></div>
+        </details>
+        <details>
+          <summary>What does it cost to run?</summary>
+          <div class="a"><p>tradedesk itself is free. The agents run inside Claude Code, so you need a Claude plan or API credits, and each daily run uses some of that. The market data comes from free public sources: Binance, FRED, CoinGecko, DefiLlama and news RSS feeds. Paper mode has no trading fees.</p></div>
+        </details>
+        <details>
+          <summary>Is my API key safe?</summary>
+          <div class="a"><p>The key lives in a <code>.env</code> file on your machine and never leaves it except in signed requests to Binance. There is no tradedesk server. The agents are blocked from reading <code>.env</code> by the Claude Code permissions in <code>.claude/settings.json</code>. Use a key with withdrawals off and an IP restriction, so that even a leaked key can't move your coins out.</p></div>
+        </details>
+        <details>
+          <summary>Can the AI place trades on its own?</summary>
+          <div class="a"><p>Not by default. The agents write ideas to a file. They can't approve them, change their size or edit the risk code. You approve each plan in the dashboard. If you set <code>auto_execute = true</code>, plans that pass the risk engine go out without asking, still sized by code and still with a stop on the exchange.</p></div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <div class="closing">
+    <div class="wrap">
+      <h2>Read the code before you trust it.</h2>
+      <p class="sub">The risk engine is one Python file. Start there, run it in paper mode for a few weeks, and let the report tell you if it's worth more.</p>
+      <a class="btn" href="https://github.com/danieljancar/tradedesk">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Get it on GitHub
+      </a>
+    </div>
+  </div>
+
+  <div class="wrap narrow">
+    <section id="legal" class="legal" style="padding-top:40px">
+      <h2>Disclaimer</h2>
+      <p>tradedesk is a hobby project by one person, built in spare time and shared as is under the <a href="https://github.com/danieljancar/tradedesk/blob/master/LICENSE">MIT license</a>. It is not a product, a service or a company.</p>
+      <ul>
+        <li><b>Not advice.</b> Nothing on this page or in the software is financial, investment, tax or legal advice. The agents' output is generated text and can be wrong.</li>
+        <li><b>No warranty.</b> The software is provided without warranty of any kind. It may have bugs. The exchange may behave differently than expected, and orders may fail, fill badly or not fill at all.</li>
+        <li><b>No liability.</b> To the fullest extent the law allows, the author is not liable for any loss, missed gain or other damage that results from using it. You run it on your own machine, with your own keys and your own money, at your own risk.</li>
+        <li><b>Real risk.</b> Crypto prices move fast, and leverage can lose you more than you expect. Past results, including replayed ones, say nothing reliable about the future. Never trade money you can't afford to lose.</li>
+        <li><b>Your local law.</b> Crypto trading, derivatives and automated trading are restricted in some countries. Check that what you do with it is legal where you live.</li>
+        <li><b>Not affiliated.</b> This project is not affiliated with, endorsed by or sponsored by Binance, Anthropic or any data or news source it reads. Names are used only to describe what the software connects to.</li>
+      </ul>
+    </section>
+  </div>
 </main>
+
+<footer>
+  <div class="wrap">
+    <span>Made by <a href="https://github.com/danieljancar">Daniel Jancar</a> on evenings and weekends.</span>
+    <span><a href="https://github.com/danieljancar/tradedesk">Source</a>&nbsp;&nbsp;&nbsp;<a href="https://github.com/danieljancar/tradedesk/blob/master/LICENSE">MIT license</a>&nbsp;&nbsp;&nbsp;<a href="#legal">Disclaimer</a></span>
+  </div>
+</footer>
+
 </body>
 </html>
