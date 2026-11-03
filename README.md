@@ -55,7 +55,13 @@ To see the dashboard without any setup, `uv run desk demo` replays a made-up run
 
 To run every morning, point cron or launchd at `scripts/daily.sh`. It calls `claude -p "/daily" --permission-mode dontAsk`, which allows only the commands listed in `.claude/settings.json`.
 
-Once a week, `/review` reads the closed trades and rewrites `lessons.md`, which the portfolio manager reads before every decision.
+Once a week, `/review` (or `scripts/review.sh` on a schedule) runs `desk stats` and rewrites `lessons.md`, which the portfolio manager reads before every decision.
+
+## Learning
+
+Every idea counts, taken, passed or rejected. `desk learn` replays each one on real 1h candles until it hits its target or stop, expires unfilled or outlives its horizon, and stores the result with the market context of that day in the `outcomes` table. Each run's snapshot facts go to `snapshots`, together with what every asset did in the 24 and 72 hours after. `desk sync` updates both on the side, at most once an hour per idea.
+
+`desk stats` (and `GET /api/learning`) turns that into calibration: hit rate and average R by confidence, asset, horizon, side and decision, the market after days with no ideas, and whether the bull or the bear side matched. Every number carries its sample size, and groups under 10 examples say "not enough data yet". Lessons may change how ideas are judged, never the risk limits. Once 10 ideas have resolved, `book.md` carries a one-line calibration summary.
 
 ## Commands
 
@@ -71,6 +77,8 @@ Once a week, `/review` reads the closed trades and rewrites `lessons.md`, which 
 | `desk stop ID PRICE`, `close ID` | Manage a position |
 | `desk kill [--flatten]` | Cancel everything |
 | `desk journal` | Closed trades with R multiples |
+| `desk learn` | Replay every idea on real candles into `outcomes` |
+| `desk stats` | Calibration report for `/review` |
 
 ## Configuration
 

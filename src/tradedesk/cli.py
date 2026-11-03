@@ -149,6 +149,26 @@ def sync() -> None:
 
 
 @app.command()
+def learn() -> None:
+    """Replay every unresolved idea on real 1h candles and record what followed each run."""
+    r = desk().learn()
+    say(f"{r['ideas']} ideas checked, {r['resolved']} resolved, {r['moves']} after-run moves")
+
+
+@app.command()
+def stats() -> None:
+    """Calibration report: hit rate and R by confidence, asset, horizon, side and decision."""
+    from tradedesk import learning
+
+    d = desk()
+    try:
+        d.learn()
+    except Exception as e:
+        say(f"(outcomes not updated, Binance did not answer: {e})")
+    say(learning.report(learning.stats(d.db)).rstrip())
+
+
+@app.command()
 def watch(every: int = 300) -> None:
     """Keep syncing, for futures entries that wait for a price."""
     while True:
