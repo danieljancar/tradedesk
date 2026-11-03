@@ -49,3 +49,9 @@ def db(settings) -> Database:
 @pytest.fixture
 def market() -> FakeMarket:
     return FakeMarket()
+
+
+@pytest.fixture(autouse=True)
+def offline(monkeypatch, market) -> None:
+    """The desk reads public candles through market_data; tests feed it the FakeMarket."""
+    monkeypatch.setattr("tradedesk.desk.market_data", lambda *a, **k: market)

@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
 
-from tradedesk import macro, notes, settings_io, wire
+from tradedesk import learning, macro, notes, settings_io, wire
 from tradedesk.binance import market_data
 from tradedesk.config import ROOT
 from tradedesk.desk import Desk
@@ -140,6 +140,11 @@ def create_app(desk: Desk) -> FastAPI:
             "closed": closed,
             "realized": round(sum(p["pnl"] or 0 for p in closed), 2),
         }
+
+    @app.get("/api/learning")
+    def learning_stats() -> dict:
+        """Calibration from the outcomes table, read only. `desk learn` or `desk sync` fills it."""
+        return learning.stats(db)
 
     @app.get("/api/state")
     def state() -> dict:

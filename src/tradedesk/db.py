@@ -73,6 +73,39 @@ CREATE TABLE IF NOT EXISTS equity (
     ts TEXT PRIMARY KEY,
     value REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS snapshots (
+    run_id TEXT NOT NULL,
+    asset TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    price REAL,
+    facts TEXT NOT NULL,
+    market TEXT,
+    move_24h REAL,
+    move_72h REAL,
+    PRIMARY KEY (run_id, asset)
+);
+CREATE TABLE IF NOT EXISTS outcomes (
+    plan_id INTEGER PRIMARY KEY REFERENCES plans(id),
+    run_id TEXT,
+    asset TEXT NOT NULL,
+    side TEXT NOT NULL,
+    horizon TEXT NOT NULL,
+    confidence INTEGER NOT NULL,
+    decision TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    r REAL NOT NULL,
+    filled_at TEXT,
+    resolved_at TEXT,
+    updated_at TEXT NOT NULL,
+    fear_greed INTEGER,
+    btc_dominance REAL,
+    funding_pct REAL,
+    rsi_1d REAL,
+    atr_pct_1d REAL,
+    vol_ratio_1d REAL,
+    change_7d REAL,
+    above_ema200_1d INTEGER
+);
 CREATE INDEX IF NOT EXISTS events_run ON events(run_id, id);
 CREATE INDEX IF NOT EXISTS plans_status ON plans(status);
 CREATE INDEX IF NOT EXISTS positions_status ON positions(status);
@@ -111,6 +144,17 @@ class Database:
                 f"INSERT INTO {table} ({cols}) VALUES ({marks})", tuple(values.values())
             )
             return cur.lastrowid or 0
+
+    def upsert(self, table: str, keys: tuple[str, ...], **values: Any) -> None:
+        cols = ", ".join(values)
+        marks = ", ".join("?" for _ in values)
+        sets = ", ".join(f"{k} = excluded.{k}" for k in values if k not in keys)
+        with self.tx() as c:
+            c.execute(
+                f"INSERT INTO {table} ({cols}) VALUES ({marks}) "
+                f"ON CONFLICT ({', '.join(keys)}) DO UPDATE SET {sets}",
+                tuple(values.values()),
+            )
 
     def update(self, table: str, row_id: int | str, **values: Any) -> None:
         sets = ", ".join(f"{k} = ?" for k in values)

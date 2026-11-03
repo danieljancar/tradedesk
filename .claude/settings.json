@@ -12,6 +12,8 @@
       "Bash(uv run desk status)",
       "Bash(uv run desk plans:*)",
       "Bash(uv run desk journal:*)",
+      "Bash(uv run desk stats)",
+      "Bash(uv run desk learn)",
       "Read(runs/**)",
       "Read(lessons.md)",
       "Edit(runs/**)",

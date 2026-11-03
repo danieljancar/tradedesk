@@ -2,7 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from tradedesk import news, notes, risk, snapshot
+from tradedesk import learning, news, notes, risk, snapshot
 from tradedesk.binance import market_data
 from tradedesk.broker import Broker, Fill, make_broker
 from tradedesk.broker.base import Unprotected
@@ -64,6 +64,7 @@ class Desk:
         text, facts = snapshot.build(self.settings, market_data(self.settings))
         (run_dir / "snapshot.md").write_text(text)
         (run_dir / "facts.json").write_text(json.dumps(facts))
+        learning.store_snapshot(self.db, run_dir.name, facts)
         self.log("prices", "output", f"Snapshot for {', '.join(self.settings.watchlist)}", text)
         return run_dir / "snapshot.md"
 
@@ -152,6 +153,9 @@ class Desk:
         lines += notes.book_lines(self.db)
         lessons = self.settings.path(Path("lessons.md"))
         lines.append("## Lessons from past reviews")
+        calibration = learning.summary_line(learning.stats(self.db))
+        if calibration:
+            lines.append(f"- {calibration}")
         lines.append(lessons.read_text().strip() if lessons.exists() else "- none yet")
         text = "\n".join(lines) + "\n"
         (run_dir / "book.md").write_text(text)
@@ -387,7 +391,15 @@ class Desk:
                 self.log("exchange", "error", f"Check on {pos['asset']} failed", str(e))
                 out.append(f"position {pos['id']}: error, {e}")
         self.db.record_equity(self.broker.equity())
+        try:
+            self.learn(stale_after=timedelta(hours=1))
+        except Exception as e:
+            self.log("desk", "error", "Outcome update failed", str(e))
         return out
+
+    def learn(self, stale_after: timedelta | None = None) -> dict:
+        """Replay every unresolved idea on real 1h candles and record what the market did."""
+        return learning.learn(self.db, self.settings, market_data(self.settings), stale_after)
 
     def _sync_entry(self, plan: dict) -> list[str]:
         status = self.broker.entry_status(plan)
