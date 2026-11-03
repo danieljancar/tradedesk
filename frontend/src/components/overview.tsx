@@ -7,7 +7,7 @@ import { pc } from "@/lib/learn";
 import { cn } from "@/lib/utils";
 
 type Point = { d: string; v: number };
-type Driver = {
+export type Driver = {
   id: string; name: string; group: string; unit: string; why: string; value: number | null; as_of: string | null;
   change_1w: number | null; change_1m: number | null; change_3m: number | null; series: Point[]; tilt: number; reason: string;
 };
@@ -19,7 +19,7 @@ type Macro = {
   fear_greed: Point[];
 };
 
-const big = (n?: number) => n == null ? "–" : n >= 1e12 ? `$${(n / 1e12).toFixed(2)}T` : n >= 1e9 ? `$${(n / 1e9).toFixed(0)}B` : `$${n.toFixed(0)}`;
+export const big = (n?: number) => n == null ? "–" : n >= 1e12 ? `$${(n / 1e12).toFixed(2)}T` : n >= 1e9 ? `$${(n / 1e9).toFixed(0)}B` : `$${n.toFixed(0)}`;
 
 function fmt(d: Driver) {
   const v = d.value;
@@ -36,7 +36,7 @@ const TILT = {
   [-1]: { label: "Headwind", cls: "bg-down/12 text-down", line: "var(--down)" },
 } as const;
 
-function DriverCard({ d }: { d: Driver }) {
+export function DriverCard({ d }: { d: Driver }) {
   const t = TILT[(Math.sign(d.tilt) as 1 | 0 | -1)];
   const ch = d.change_1m;
   return (
@@ -83,7 +83,7 @@ function DriverCard({ d }: { d: Driver }) {
   );
 }
 
-function Compare({ sp }: { sp?: Driver }) {
+export function Compare({ sp }: { sp?: Driver }) {
   const [btc, setBtc] = useState<Candle[]>([]);
   useEffect(() => { api<Candle[]>("/api/candles/BTC?tf=1d&limit=120").then(setBtc).catch(() => {}); }, []);
   const data = useMemo(() => {
@@ -116,7 +116,7 @@ function Compare({ sp }: { sp?: Driver }) {
   );
 }
 
-function FearGreed({ series }: { series: Point[] }) {
+export function FearGreed({ series }: { series: Point[] }) {
   const last = series.at(-1)?.v;
   const color = last == null ? "var(--t-dim)" : last < 25 ? "var(--down)" : last < 45 ? "var(--warn)" : last <= 55 ? "var(--t-dim)" : "var(--up)";
   return (

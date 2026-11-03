@@ -154,6 +154,7 @@ def create_app(desk: Desk) -> FastAPI:
             "market": desk.settings.market,
             "quote": desk.settings.quote,
             "limits": desk.settings.risk.model_dump(),
+            "watchlist": desk.settings.watchlist,
             "auto_execute": desk.settings.execution.auto_execute,
             "equity": db.all("SELECT ts, value FROM equity ORDER BY ts DESC LIMIT 200")[::-1],
             "positions": positions,
@@ -258,5 +259,12 @@ def create_app(desk: Desk) -> FastAPI:
     def sync(x_desk: str | None = Header(None)) -> dict:
         guard(x_desk)
         return {"result": desk.sync()}
+
+    @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
+    def spa(path: str) -> str:
+        # client-side routes (/markets/BTC, /trades, ...) all load the same page
+        if path.startswith(("api/", "assets/")):
+            raise HTTPException(404, "not found")
+        return index()
 
     return app

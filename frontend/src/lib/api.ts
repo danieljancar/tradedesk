@@ -5,7 +5,7 @@ export type DeskEvent = { id: number; run_id: string; ts: string; actor: string;
 export type Plan = Record<string, any> & { id: number; asset: string; side: string; status: string };
 export type Position = Record<string, any> & { id: number; asset: string; side: string };
 export type DeskState = {
-  mode: string; market: string; quote: string; auto_execute?: boolean;
+  mode: string; market: string; quote: string; auto_execute?: boolean; watchlist?: string[];
   limits?: { risk_per_trade_pct: number; max_open_positions: number; daily_loss_limit_pct: number; max_leverage: number } & Record<string, number>;
   equity: { ts: string; value: number }[];
   positions: Position[]; plans: Plan[]; closed: Position[];
