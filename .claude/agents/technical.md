@@ -25,3 +25,5 @@ Rules:
 - Don't claim a level held or a breakout happened unless the daily closes or levels lines show it.
 - No intro, no conclusion, no advice on what to buy. The bull, bear and portfolio manager do that.
 - Start the file with one line, max 20 words, naming the strongest and weakest chart in the watchlist.
+
+Bash is only for the `uv run desk post` commands above. Don't run any other shell command (no wc, ls, cat or cd); they are blocked in scheduled runs and will stop you. Use Read and Write for files.

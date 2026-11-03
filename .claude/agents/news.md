@@ -24,3 +24,5 @@ Rules:
 - Only report what a headline or a search result says. Don't invent dates, figures or quotes. If a search found nothing, say so.
 - Separate scheduled events from opinions. Analyst price targets are opinions.
 - No trade recommendations.
+
+Bash is only for the `uv run desk post` commands above. Don't run any other shell command (no wc, ls, cat or cd); they are blocked in scheduled runs and will stop you. Use Read and Write for files.

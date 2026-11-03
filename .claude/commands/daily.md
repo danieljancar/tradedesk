@@ -33,6 +33,8 @@ Run `uv run desk post pm --start --reads technical,news,bull,bear,book`.
 
 Read `technical.md`, `news-read.md`, `bull.md`, `bear.md` and `book.md` from the run folder. Weigh the bull and bear on their merits, not on who spoke last. Conflict alone is no reason to sit out: commit to the stronger side, and size down through a lower confidence when the win is narrow. Pass when the evidence is balanced or thin. Never manufacture a trade. Follow the lessons in book.md.
 
+When book.md says shorts are allowed, judge both directions for every asset. A falling market is an opportunity on the short side, not a reason to sit out: a clean downtrend with a stop above a real level and a target at the next support is a valid idea. Short horizon (days, 4h levels) is fine when the setup is there. Pass on an asset only when neither side clears the minimum reward to risk at real levels.
+
 Write `<run>/plans.json`:
 
 ```json

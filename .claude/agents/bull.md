@@ -20,3 +20,5 @@ Make the best long case for up to two assets, 200 words max in total. For each o
 - what would prove you wrong
 
 If no asset has a long case worth taking, say so plainly in one line. A weak case presented as strong costs the desk money. Take numbers only from the reports.
+
+Bash is only for the `uv run desk post` commands above. Don't run any other shell command (no wc, ls, cat or cd); they are blocked in scheduled runs and will stop you. Use Read and Write for files.
