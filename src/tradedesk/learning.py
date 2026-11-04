@@ -51,6 +51,8 @@ def context(facts: dict, market: dict) -> dict:
         "vol_ratio_1d": d1.get("vol_ratio"),
         "change_7d": (facts.get("change") or {}).get("7d"),
         "above_ema200_1d": None if price is None or ema200 is None else int(price > ema200),
+        "source": facts.get("source"),
+        "asset_class": facts.get("asset_class"),
     }
 
 
@@ -293,6 +295,7 @@ def stats(db: Database) -> dict:
         "by_horizon": group(rows, lambda r: r["horizon"]),
         "by_side": group(rows, lambda r: r["side"]),
         "by_decision": group(rows, lambda r: r["decision"]),
+        "by_source": group(rows, lambda r: r.get("source") or "watchlist"),
         "pass_days": {
             "runs": len({r["run_id"] for r in pass_moves}),
             **{k: moves(col(pass_moves, k)) for k in WINDOWS},
@@ -322,6 +325,7 @@ def report(data: dict) -> str:
         "by_horizon": "By horizon",
         "by_side": "By side",
         "by_decision": "Taken, passed (cleared risk, not taken), rejected (by risk)",
+        "by_source": "By source",
     }
     for key, title in titles.items():
         out.append(f"## {title}")

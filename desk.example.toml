@@ -36,3 +36,12 @@ long = 120
 auto_execute = false   # true sends every plan that passes the risk check without asking
 close_expired = true   # close positions held longer than their horizon allows
 entry_ttl_hours = 24   # cancel limit entries that haven't filled by then
+
+[universe]
+enabled = true                # false uses only the watchlist
+min_quote_volume = 20000000   # skip pairs with less 24h volume in the quote currency
+top = 6                       # movers the scan adds each day
+max_assets = 12               # watchlist, always, gold and scan picks together
+always = []                   # assets looked at every day on top of the watchlist
+exclude = []                  # assets the scan never picks
+include_gold = true           # add PAXG as gold

@@ -18,6 +18,8 @@ NAMES = {
     "AVAX": ["avalanche", "avax"],
     "LINK": ["chainlink", "link"],
     "SUI": ["sui"],
+    "PAXG": ["paxg", "pax gold", "gold", "bullion"],
+    "XAUT": ["xaut", "tether gold", "gold", "bullion"],
 }
 MACRO = re.compile(
     r"\b(fed|fomc|powell|rate cut|rate hike|cpi|inflation|jobs report|payrolls|treasury|"

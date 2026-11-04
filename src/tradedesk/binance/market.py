@@ -58,6 +58,13 @@ class MarketData:
         path = "/api/v3/ticker/price" if self.market is Market.SPOT else "/fapi/v2/ticker/price"
         return float(self.trading.public(path, symbol=symbol)["price"])
 
+    def tickers(self) -> list[dict]:
+        """24h stats for every spot pair."""
+        return self.spot.public("/api/v3/ticker/24hr")
+
+    def spot_symbols(self) -> list[dict]:
+        return self.spot.public("/api/v3/exchangeInfo")["symbols"]
+
     def derivatives(self, symbol: str) -> dict | None:
         try:
             premium = self.futures.public("/fapi/v1/premiumIndex", symbol=symbol)

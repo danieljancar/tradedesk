@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import httpx
 
+from tradedesk import universe
 from tradedesk.binance.market import MarketData
 from tradedesk.config import Settings
 from tradedesk.indicators import Candle, atr, ema, macd_hist, pct, rsi, swing_levels
@@ -128,14 +129,23 @@ def sentiment() -> tuple[str, dict]:
     return f"{fng}\n{glob}", market
 
 
-def build(settings: Settings, md: MarketData) -> tuple[str, dict[str, dict]]:
+def build(
+    settings: Settings, md: MarketData, assets: list[dict] | None = None
+) -> tuple[str, dict[str, dict]]:
     stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     mood, market = sentiment()
     blocks, facts = [f"# Market snapshot {stamp}", mood], {"_market": market}
-    for asset in settings.watchlist:
+    for item in assets if assets is not None else universe.watchlist(settings):
+        asset = item["asset"]
         symbol = settings.symbol(asset)
         try:
             block, facts[asset] = asset_block(md, symbol)
+            facts[asset] |= {
+                "source": item["source"],
+                "asset_class": item["asset_class"],
+                "scan_score": item.get("score"),
+                "reason": item.get("reason"),
+            }
         except Exception as e:
             block = f"## {symbol}\ndata error: {e}. Do not trade this asset today."
         blocks.append(block)

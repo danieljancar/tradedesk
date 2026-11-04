@@ -1,8 +1,9 @@
 import json
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from tradedesk import learning, news, notes, risk, snapshot
+from tradedesk import learning, news, notes, risk, snapshot, universe
 from tradedesk.binance import market_data
 from tradedesk.broker import Broker, Fill, make_broker
 from tradedesk.broker.base import Unprotected
@@ -58,20 +59,49 @@ class Desk:
         first = next((ln.strip("# ").strip() for ln in body.splitlines() if ln.strip()), actor)
         self.log(actor, "output", first[:140], body, refs=reads)
 
+    def write_universe(self, extra: Iterable[str] = ()) -> Path:
+        run_dir = self.run_dir(self.run_id() or self.start_run())
+        if not self.settings.universe.enabled:
+            assets = universe.watchlist(self.settings)
+            universe.write(run_dir, assets)
+            self.log("scanner", "output", "Scan is off, using the watchlist")
+            return run_dir / "universe.md"
+        self.log("scanner", "start", f"Scanning {self.settings.quote} spot pairs")
+        try:
+            scanned = universe.scan(self.settings, market_data(self.settings))
+        except Exception as e:
+            self.log("scanner", "error", "Scan failed, watchlist and fixed assets only", str(e))
+            scanned = []
+        assets = universe.assets_for_run(self.settings, scanned, extra)
+        text = universe.write(run_dir, assets)
+        found = [a["asset"] for a in assets if a["source"] == "scan"]
+        title = f"{len(assets)} assets, from the scan: {', '.join(found) or 'none'}"
+        self.log("scanner", "output", title, text)
+        return run_dir / "universe.md"
+
+    def run_assets(self) -> list[dict]:
+        run_id = self.run_id()
+        saved = universe.read(self.run_dir(run_id)) if run_id else None
+        if not saved or not self.settings.universe.enabled:
+            return universe.watchlist(self.settings)
+        return saved
+
     def write_snapshot(self) -> Path:
         run_dir = self.run_dir(self.run_id() or self.start_run())
+        assets = self.run_assets()
         self.log("prices", "start", "Pulling candles, funding and open interest")
-        text, facts = snapshot.build(self.settings, market_data(self.settings))
+        text, facts = snapshot.build(self.settings, market_data(self.settings), assets)
         (run_dir / "snapshot.md").write_text(text)
         (run_dir / "facts.json").write_text(json.dumps(facts))
         learning.store_snapshot(self.db, run_dir.name, facts)
-        self.log("prices", "output", f"Snapshot for {', '.join(self.settings.watchlist)}", text)
+        names = ", ".join(a["asset"] for a in assets)
+        self.log("prices", "output", f"Snapshot for {names}", text)
         return run_dir / "snapshot.md"
 
     def write_news(self) -> Path:
         run_dir = self.run_dir(self.run_id() or self.start_run())
         self.log("headlines", "start", "Reading news feeds")
-        text = news.build(self.settings.news_feeds, self.settings.watchlist)
+        text = news.build(self.settings.news_feeds, [a["asset"] for a in self.run_assets()])
         (run_dir / "news.md").write_text(text)
         count = sum(1 for ln in text.splitlines() if ln.startswith("- ["))
         self.log("headlines", "output", f"{count} headlines sorted by asset", text)
@@ -89,6 +119,7 @@ class Desk:
         for p in pending:
             open_risk += p["risk_amount"] or 0
             taken.add((p["asset"], p["horizon"]))
+        allowed = {a["asset"] for a in self.run_assets()} | {a for a, _ in taken}
         day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0).isoformat()
         return risk.Book(
             equity=equity,
@@ -98,6 +129,7 @@ class Desk:
             open_risk=open_risk,
             open_count=len(self.db.open_positions()) + len(pending),
             taken=taken,
+            allowed=allowed,
         )
 
     def write_book(self) -> Path:
