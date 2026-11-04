@@ -57,6 +57,20 @@ To run every morning, point cron or launchd at `scripts/daily.sh`. It calls `cla
 
 Once a week, `/review` (or `scripts/review.sh` on a schedule) runs `desk stats` and rewrites `lessons.md`, which the portfolio manager reads before every decision.
 
+## Telegram
+
+The desk can message you on Telegram and take your answer from there. You get a message when a plan passes the risk check (with Approve and Drop buttons unless `auto_execute` is on), when an entry fills, when a position closes by stop or target, when the exchange returns an error, when a run finishes and when the kill switch is used. A position without a working stop is always sent, even during quiet hours and even if `error` is left out of `events`.
+
+1. Message [@BotFather](https://t.me/BotFather), send `/newbot` and copy the token it gives you.
+2. Send your new bot any message, then open `https://api.telegram.org/bot<token>/getUpdates` in a browser. The number under `"chat":{"id":...}` is your chat id.
+3. Put both in `.env` as `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+4. In `desk.toml` set `telegram = true` under `[notify]`. `events` picks which messages you get, `quiet_hours = "23-07"` holds back everything except errors and stop-outs during those local hours.
+5. Run `uv run desk report --send` once to check it arrives.
+
+`desk bot` long-polls Telegram and only answers your chat id. Approve on a plan does the same as the dashboard: approve, then send it to the exchange. `/status` shows equity, open positions with open P&L and pending entries, `/plans` lists plans waiting with their buttons, `/report` sends the digest, `/kill` cancels every pending order and `/flatten` also closes every position. Both ask for a second tap, and that button stops working after 5 minutes.
+
+On a Mac, `scripts/launchd/install.sh 07:30` installs two launchd jobs for your user: the bot, restarted if it stops, and `desk report --send` every morning at 07:30. Logs go to `data/logs/`. `scripts/launchd/install.sh --remove` takes both out again.
+
 ## Learning
 
 Every idea counts, taken, passed or rejected. `desk learn` replays each one on real 1h candles until it hits its target or stop, expires unfilled or outlives its horizon, and stores the result with the market context of that day in the `outcomes` table. Each run's snapshot facts go to `snapshots`, together with what every asset did in the 24 and 72 hours after. `desk sync` updates both on the side, at most once an hour per idea.
@@ -79,6 +93,8 @@ Every idea counts, taken, passed or rejected. `desk learn` replays each one on r
 | `desk journal` | Closed trades with R multiples |
 | `desk learn` | Replay every idea on real candles into `outcomes` |
 | `desk stats` | Calibration report for `/review` |
+| `desk report [--send]` | Short digest, printed or sent to Telegram |
+| `desk bot` | Telegram bot for approvals, status and the kill switch |
 
 ## Configuration
 

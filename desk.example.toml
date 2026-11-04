@@ -36,3 +36,8 @@ long = 120
 auto_execute = false   # true sends every plan that passes the risk check without asking
 close_expired = true   # close positions held longer than their horizon allows
 entry_ttl_hours = 24   # cancel limit entries that haven't filled by then
+
+[notify]
+telegram = false   # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
+events = ["proposed", "fill", "exit", "error", "run", "kill"]
+quiet_hours = ""   # e.g. "23-07" local time; then only errors and stop-outs come through
