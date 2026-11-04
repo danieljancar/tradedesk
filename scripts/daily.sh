@@ -18,4 +18,6 @@ status=$?
 # If the agents stopped half way, finish the mechanical steps so no run is left hanging.
 uv run desk run recover >>"$log" 2>&1 || true
 uv run desk sync >>"$log" 2>&1 || true
+# Core sleeve: propose rebalancing buys and trims; with auto_execute they go out right away.
+uv run desk rebalance --propose >>"$log" 2>&1 && uv run desk execute >>"$log" 2>&1 || true
 exit $status

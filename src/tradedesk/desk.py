@@ -111,6 +111,8 @@ class Desk:
 
     def write_snapshot(self) -> Path:
         run_dir = self.run_dir(self.run_id() or self.start_run())
+        if self.settings.universe.enabled and self.db.run_universe(run_dir.name) is None:
+            self.write_universe()
         assets = self.run_assets()
         self.log("prices", "start", "Pulling candles, funding and open interest")
         text, facts = snapshot.build(self.settings, market_data(self.settings), assets)

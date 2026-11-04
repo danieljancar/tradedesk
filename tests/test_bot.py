@@ -204,3 +204,11 @@ def test_network_errors_back_off(bot, api, capsys):
     bot.run(stop=lambda: next(polls) >= 8)
     assert waits == [2, 4, 8, 16, 32, 60, 60]
     assert "retrying in 2s" in capsys.readouterr().err
+
+
+def test_approve_says_when_a_plan_expired(bot, api, tmp_path):
+    plan_id = proposed(bot, tmp_path)
+    bot.desk.db.update("plans", plan_id, created_at="2020-01-01T00:00:00+00:00")
+    bot.handle(press(f"approve:{plan_id}"))
+    assert bot.desk.db.one("SELECT status FROM plans")["status"] == "expired"
+    assert "Expired before it was approved" in Api.bodies(api.edit)[0]["text"]

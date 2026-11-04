@@ -206,3 +206,20 @@ def test_outcomes_columns_migrate_once(settings):
     db = Database(settings.db_path)
     cols = {r["name"] for r in db.all("PRAGMA table_info(outcomes)")}
     assert {"source", "asset_class"} <= cols
+
+
+def test_snapshot_runs_the_scan_first(monkeypatch, tmp_path):
+    from tradedesk import desk as desk_module
+    from tradedesk.config import Settings
+    from tradedesk.db import Database
+    from tradedesk.desk import Desk
+
+    settings = Settings(db_path=tmp_path / "d.db", runs_dir=tmp_path / "runs")
+    d = Desk(settings, Database(settings.db_path), broker=object())
+    calls = []
+    monkeypatch.setattr(Desk, "write_universe", lambda self, extra=(): calls.append(1))
+    monkeypatch.setattr(desk_module.snapshot, "build", lambda s, md, assets: ("", {}))
+    monkeypatch.setattr(desk_module, "market_data", lambda s: None)
+    d.start_run()
+    d.write_snapshot()
+    assert calls == [1]

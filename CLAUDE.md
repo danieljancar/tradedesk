@@ -1,10 +1,10 @@
 # tradedesk
 
-A local crypto desk. Python code fetches data, enforces risk and talks to Binance. Agents in `.claude/agents` write the analysis. `/daily` runs a full day, `/review` updates `lessons.md` from the calibration stats.
+A local crypto desk: whole-market scan, gold, a trading sleeve and an optional long-term core sleeve, Telegram alerts. Python code fetches data, enforces risk and talks to Binance. Agents in `.claude/agents` write the analysis. `/daily` runs a full day, `/review` updates `lessons.md` from the calibration stats.
 
 ## Commands
 
-`uv run desk --help` lists everything. The ones you'll use: `run start`, `sync`, `snapshot`, `news`, `book`, `post`, `check`, `execute`, `status`, `journal`, `learn`, `stats`. Run folders live in `runs/<id>/`.
+`uv run desk --help` lists everything. The ones you'll use: `run start`, `sync`, `snapshot` (runs the market scan first), `news`, `book`, `post`, `check`, `execute`, `status`, `journal`, `learn`, `stats`. For you, not the agents: `scan`, `rebalance`, `trim`, `analytics`, `report`, `bot`. Run folders live in `runs/<id>/`.
 
 ## Rules
 

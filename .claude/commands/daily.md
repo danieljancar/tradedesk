@@ -12,7 +12,6 @@ Run these and note the run folder from the first line:
 ```
 uv run desk run start
 uv run desk sync
-uv run desk scan
 uv run desk snapshot
 uv run desk news
 uv run desk book

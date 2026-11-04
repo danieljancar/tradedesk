@@ -155,8 +155,12 @@ class Bot:
         text = plan_text(plan, self.desk.settings.quote)
         try:
             self.desk.approve(plan_id)
-        except ValueError:
-            return "Not waiting", f"{text}\n\nAlready {e(plan['status'])}, nothing done."
+        except ValueError as err:
+            status = self._plan(plan_id)["status"]
+            reason = f"Already {e(status)}, nothing done." if status != "proposed" else e(err)
+            if status == "expired":
+                reason = f"Expired before it was approved, nothing done. {e(err)}"
+            return "Not done", f"{text}\n\n{reason}"
         result = self.desk.execute(only=plan_id)
         detail = e("; ".join(result) or "approved, waiting for the next execute")
         return "Approved", f"{text}\n\n<b>Approved</b>, {detail}"
