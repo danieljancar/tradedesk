@@ -214,6 +214,36 @@ export const GLOSSARY: Record<string, Term> = {
     long: "Fills are simulated on live Binance prices. Nothing reaches the exchange.",
     match: /\bpaper\b/i,
   },
+  core: {
+    term: "Core sleeve",
+    short: "The part of the account held for the long run, kept at target weights.",
+    long: "You set the share, for example 40%, and the mix, for example 60% Bitcoin and 40% gold. The desk buys when an asset falls below its target and sells when it runs above, so it buys low and sells high by rule. The rest of the account is the trading sleeve.",
+  },
+  drift: {
+    term: "Off target",
+    short: "How far a core holding is from its target value, in percent of that target.",
+    long: "A holding with a 100 USDT target that is worth 90 is 10% under. The desk only rebalances past the band you set, so small moves don't cause trades and fees.",
+  },
+  sharpe: {
+    term: "Sharpe ratio",
+    short: "Return per unit of ups and downs. Above 1 is decent, above 2 is strong.",
+    long: "It's the average daily return divided by how much daily returns swing, scaled to a year. The Sortino ratio is the same idea but only counts the down days as risk. Both need a few weeks of history before they say anything.",
+  },
+  profit_factor: {
+    term: "Profit factor",
+    short: "Money made on winners divided by money lost on losers.",
+    long: "1.0 means breaking even. 1.5 means every franc lost was matched by 1.50 won.",
+  },
+  expectancy: {
+    term: "Expectancy",
+    short: "What an average trade made, in R and in money.",
+    long: "With 1R being the planned loss at the stop, an expectancy of 0.3R means a typical trade made 30% of what it risked. Below zero, the trades lose money on average no matter how many win.",
+  },
+  scan: {
+    term: "Scan",
+    short: "The desk's daily search through every coin on Binance with enough volume.",
+    long: "It keeps the few that moved most against Bitcoin over 7 days or traded far above their usual volume. Those join the watchlist and gold for one run and face the same rules as any other trade.",
+  },
 };
 
 const TERM_KEYS = Object.keys(GLOSSARY).filter((k) => GLOSSARY[k].match);

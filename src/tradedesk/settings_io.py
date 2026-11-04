@@ -6,10 +6,10 @@ import tomllib
 from pathlib import Path
 
 from tradedesk import profiles
-from tradedesk.config import ROOT, Settings
+from tradedesk.config import ROOT, RiskLimits, Settings
 
 READ_ONLY = {"mode", "market", "quote", "db_path", "runs_dir"}
-EDITABLE_TABLES = {"risk", "execution", "hold_days", "portfolio"}
+EDITABLE_TABLES = {"risk", "execution", "hold_days", "portfolio", "universe", "notify"}
 
 
 def config_path() -> Path:
@@ -55,6 +55,12 @@ def to_toml(data: dict) -> str:
     return "\n".join(out) + "\n"
 
 
+def _switches_profile(current: dict, risk: dict) -> bool:
+    """Leaving a profile for custom limits keeps the values sent, they aren't echoes."""
+    old = current.get("risk", {}).get("profile")
+    return "profile" in risk and risk["profile"] is None and old is not None
+
+
 def update(changes: dict) -> Settings:
     """Merge editable changes into the config file, validate, write. Returns the new settings."""
     path = config_path()
@@ -64,7 +70,10 @@ def update(changes: dict) -> Settings:
     for key, value in changes.items():
         if key in READ_ONLY:
             raise ValueError(f"{key} can only be changed in {path.name} by hand")
-        if key in EDITABLE_TABLES and isinstance(value, dict):
+        if key == "risk" and isinstance(value, dict) and _switches_profile(current, value):
+            base = RiskLimits.model_validate({"profile": value.get("profile")}).model_dump()
+            merged[key] = {k: v for k, v in value.items() if k == "profile" or v != base.get(k)}
+        elif key in EDITABLE_TABLES and isinstance(value, dict):
             table = current.get(key, {})
             # a value the client only echoed back, unchanged and never set in the file, stays unset
             value = {

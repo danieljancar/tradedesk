@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
 import {
-  ArrowLeftRight, BookOpen, CandlestickChart, LayoutDashboard, Moon, Newspaper, Play, RefreshCw, Settings, Sun, Users,
+  ArrowLeftRight, BookOpen, CandlestickChart, LayoutDashboard, LineChart, Menu, Moon, Newspaper, Play, RefreshCw, Settings, Sun, Users, Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar } from "@/components/panels";
 import { useDeskCtx } from "@/lib/desk-context";
 import { px } from "@/lib/learn";
@@ -11,9 +12,11 @@ import { cn } from "@/lib/utils";
 
 export const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/portfolio", label: "Portfolio", icon: Wallet },
   { to: "/markets", label: "Markets", icon: CandlestickChart },
   { to: "/desk", label: "Desk", icon: Users },
   { to: "/trades", label: "Trades", icon: ArrowLeftRight },
+  { to: "/performance", label: "Performance", icon: LineChart },
   { to: "/news", label: "News", icon: Newspaper },
   { to: "/learn", label: "Learn", icon: BookOpen },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -28,6 +31,7 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
   const d = useDeskCtx();
   const loc = useLocation();
   const [syncing, setSyncing] = useState(false);
+  const [more, setMore] = useState(false);
   const latest = d.runs[0];
   const live = latest?.status === "running";
   const lastAt = useClock(latest?.started_at);
@@ -107,9 +111,23 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
             <Icon className="size-5" />{label}
           </NavLink>
         ))}
-        <NavLink to="/settings" className={({ isActive }) => cn("flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]", isActive ? "text-brand-strong" : "text-dim")}>
-          <Settings className="size-5" />More
-        </NavLink>
+        <Sheet open={more} onOpenChange={setMore}>
+          <SheetTrigger className={cn("flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]", NAV.slice(5).some((n) => loc.pathname.startsWith(n.to)) ? "text-brand-strong" : "text-dim")}>
+            <Menu className="size-5" />More
+          </SheetTrigger>
+          <SheetContent side="bottom" className="pb-6">
+            <SheetHeader><SheetTitle>More pages</SheetTitle></SheetHeader>
+            <ul className="grid gap-1 px-4">
+              {NAV.slice(5).map(({ to, label, icon: Icon }) => (
+                <li key={to}>
+                  <NavLink to={to} onClick={() => setMore(false)} className={({ isActive }) => cn("flex min-h-11 items-center gap-3 rounded-md px-3 text-[15px]", isActive ? "bg-brand-soft text-brand-strong" : "hover:bg-raised")}>
+                    <Icon className="size-5" />{label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </SheetContent>
+        </Sheet>
       </nav>
     </div>
   );

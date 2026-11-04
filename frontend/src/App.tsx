@@ -6,6 +6,8 @@ import { Shell } from "@/components/shell";
 import { TermLayer } from "@/components/term";
 import { DeskProvider } from "@/lib/desk-context";
 import Overview from "@/pages/overview";
+import Portfolio from "@/pages/portfolio";
+import Performance from "@/pages/performance";
 import Markets from "@/pages/markets";
 import Desk from "@/pages/desk";
 import Trades from "@/pages/trades";
@@ -36,10 +38,12 @@ export default function App() {
             <Shell dark={dark} toggle={toggle}>
               <Routes>
                 <Route path="/" element={<Overview />} />
+                <Route path="/portfolio" element={<Portfolio />} />
                 <Route path="/markets" element={<Markets />} />
                 <Route path="/markets/:asset" element={<Markets />} />
                 <Route path="/desk" element={<Desk />} />
                 <Route path="/trades" element={<Trades />} />
+                <Route path="/performance" element={<Performance />} />
                 <Route path="/news" element={<News />} />
                 <Route path="/learn" element={<Learn />} />
                 <Route path="/settings" element={<Settings />} />

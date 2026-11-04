@@ -71,3 +71,16 @@ def test_portfolio_table_round_trips(tmp_path, monkeypatch):
     assert again.portfolio == new.portfolio
     with pytest.raises(ValidationError):
         settings_io.update({"portfolio": {"core_targets": {"BTC": 50}}})
+
+
+def test_switching_to_custom_keeps_the_profile_values(tmp_path, monkeypatch):
+    from tradedesk import settings_io
+
+    cfg = tmp_path / "desk.toml"
+    cfg.write_text('[risk]\nprofile = "aggressive"\n')
+    monkeypatch.setenv("DESK_CONFIG", str(cfg))
+    risk = settings_io.read()["settings"]["risk"]
+    new = settings_io.update({"risk": {**risk, "profile": None}})
+    assert new.risk.profile is None
+    assert new.risk.risk_per_trade_pct == 2.0
+    assert new.risk.max_open_positions == 8

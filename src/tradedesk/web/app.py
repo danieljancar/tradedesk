@@ -10,7 +10,17 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
 
-from tradedesk import analytics, learning, macro, notes, portfolio, settings_io, universe, wire
+from tradedesk import (
+    analytics,
+    learning,
+    macro,
+    notes,
+    notify,
+    portfolio,
+    settings_io,
+    universe,
+    wire,
+)
 from tradedesk.binance import market_data
 from tradedesk.config import ROOT
 from tradedesk.desk import Desk
@@ -162,6 +172,10 @@ def create_app(desk: Desk) -> FastAPI:
             "limits": desk.settings.risk.model_dump(),
             "watchlist": desk.settings.watchlist,
             "auto_execute": desk.settings.execution.auto_execute,
+            "telegram": {
+                "enabled": desk.settings.notify.telegram,
+                "configured": notify.from_env() is not None,
+            },
             "equity": db.all("SELECT ts, value FROM equity ORDER BY ts DESC LIMIT 200")[::-1],
             "positions": positions,
             "plans": db.all(
@@ -242,7 +256,8 @@ def create_app(desk: Desk) -> FastAPI:
             new = settings_io.update(body)
         except ValueError as e:
             raise HTTPException(422, str(e)) from e
-        for field in ("watchlist", "paper_equity", "risk", "execution", "hold_days", "portfolio"):
+        editable = ("watchlist", "paper_equity", "risk", "execution", "hold_days")
+        for field in (*editable, "portfolio", "universe", "notify"):
             setattr(desk.settings, field, getattr(new, field))
         return settings_io.read()
 
