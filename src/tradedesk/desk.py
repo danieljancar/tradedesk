@@ -1,5 +1,6 @@
 import json
-from collections.abc import Iterable
+import sys
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -17,6 +18,7 @@ class Desk:
         self.settings = settings
         self.db = db
         self._broker = broker
+        self.listeners: list[Callable[[dict], None]] = []
 
     @property
     def broker(self) -> Broker:
@@ -34,7 +36,22 @@ class Desk:
         return path
 
     def log(self, actor: str, kind: str, title: str, body: str | None = None, refs=None) -> None:
-        self.db.log(self.run_id(), actor, kind, title, body, refs)
+        run_id = self.run_id()
+        event_id = self.db.log(run_id, actor, kind, title, body, refs)
+        event = dict(
+            id=event_id,
+            run_id=run_id,
+            actor=actor,
+            kind=kind,
+            title=title,
+            body=body,
+            refs=refs or [],
+        )
+        for listener in self.listeners:
+            try:
+                listener(event)
+            except Exception as e:
+                print(f"listener failed: {e}", file=sys.stderr)
 
     def start_run(self) -> str:
         run_id = datetime.now(UTC).strftime("%Y-%m-%dT%H%M")

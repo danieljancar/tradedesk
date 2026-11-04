@@ -45,3 +45,8 @@ max_assets = 12               # watchlist, always, gold and scan picks together
 always = []                   # assets looked at every day on top of the watchlist
 exclude = []                  # assets the scan never picks
 include_gold = true           # add PAXG as gold
+
+[notify]
+telegram = false   # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
+events = ["proposed", "fill", "exit", "error", "run", "kill"]
+quiet_hours = ""   # e.g. "23-07" local time; then only errors and stop-outs come through

@@ -3,8 +3,9 @@ import tomllib
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 ROOT = Path(os.environ.get("DESK_HOME", Path.cwd()))
 
@@ -73,6 +74,36 @@ class Universe(BaseModel):
     include_gold: bool = True
 
 
+NotifyEvent = Literal["proposed", "fill", "exit", "error", "run", "kill"]
+
+
+class Notify(BaseModel):
+    telegram: bool = False
+    events: list[NotifyEvent] = ["proposed", "fill", "exit", "error", "run", "kill"]
+    quiet_hours: str = ""
+
+    @field_validator("quiet_hours")
+    @classmethod
+    def _hours(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            return v
+        start, sep, end = v.partition("-")
+        if not sep or not (start.isdigit() and end.isdigit()):
+            raise ValueError('quiet_hours looks like "23-07"')
+        if not (0 <= int(start) <= 23 and 0 <= int(end) <= 23):
+            raise ValueError("quiet_hours uses hours 0 to 23")
+        return v
+
+    def quiet(self, hour: int) -> bool:
+        if not self.quiet_hours:
+            return False
+        start, end = (int(x) for x in self.quiet_hours.split("-"))
+        if start == end:
+            return False
+        return start <= hour < end if start < end else hour >= start or hour < end
+
+
 class Settings(BaseModel):
     mode: Mode = Mode.PAPER
     market: Market = Market.SPOT
@@ -93,6 +124,7 @@ class Settings(BaseModel):
     db_path: Path = Path("data/desk.db")
     runs_dir: Path = Path("runs")
     universe: Universe = Universe()
+    notify: Notify = Notify()
 
     def symbol(self, asset: str) -> str:
         return f"{asset.upper()}{self.quote}"

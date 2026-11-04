@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from tradedesk import notify
 from tradedesk.config import settings
 from tradedesk.db import Database
 from tradedesk.desk import Desk
@@ -17,7 +18,9 @@ app.add_typer(run_app, name="run", help="Start and finish a daily run.")
 @cache
 def desk() -> Desk:
     s = settings()
-    return Desk(s, Database(s.path(s.db_path)))
+    d = Desk(s, Database(s.path(s.db_path)))
+    notify.attach(d)
+    return d
 
 
 def say(lines: list[str] | str) -> None:
@@ -264,3 +267,32 @@ def demo(port: int = 8421, pause: float = 1.6) -> None:
 def scan() -> None:
     """Scan the spot market for movers and write today's universe."""
     say(str(desk().write_universe()))
+
+
+@app.command()
+def bot() -> None:
+    """Telegram bot: approve plans, /status, /report, /kill and /flatten from your phone."""
+    from tradedesk.bot import Bot
+
+    d = desk()
+    telegram = notify.from_env()
+    if telegram is None:
+        say("set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env first")
+        raise typer.Exit(1)
+    say("bot polling, Ctrl-C to stop")
+    Bot(d, telegram, d.settings.path(d.settings.db_path).parent / "telegram_offset").run()
+
+
+@app.command()
+def report(send: bool = False) -> None:
+    """Short digest: equity and 24h change, open positions, waiting plans, the latest run."""
+    d = desk()
+    say(notify.digest(d))
+    if not send:
+        return
+    telegram = notify.from_env()
+    if telegram is None:
+        say("set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env first")
+        raise typer.Exit(1)
+    telegram.send(notify.digest(d, html=True))
+    say("sent")
