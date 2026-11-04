@@ -4,6 +4,11 @@ import { api, useDesk, useInterval } from "@/lib/api";
 
 export type Note = { id: number; ts: string; kind: string; asset: string | null; price: number | null; text: string };
 export type Headline = { title: string; link: string; source: string; category: string; ts: number };
+export type UniverseAsset = {
+  asset: string; asset_class: "crypto" | "gold"; source: "watchlist" | "always" | "gold" | "core" | "scan";
+  score: number | null; price: number | null; change_24h: number | null; change_7d: number | null; rel_btc_7d: number | null;
+  vol_surge: number | null; atr_pct: number | null; quote_volume: number | null; reason: string | null;
+};
 
 type Ctx = ReturnType<typeof useDesk> & {
   notes: Note[];
@@ -14,6 +19,7 @@ type Ctx = ReturnType<typeof useDesk> & {
   runNow: () => Promise<void>;
   act: (path: string, method?: string, ok?: string, body?: unknown) => Promise<boolean>;
   watch: string[];
+  universe: UniverseAsset[];
 };
 
 const DeskCtx = createContext<Ctx | null>(null);
@@ -34,6 +40,9 @@ export function DeskProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [news, setNews] = useState<Headline[]>([]);
   const [macro, setMacro] = useState<any>(null);
+  const [universe, setUniverse] = useState<UniverseAsset[]>([]);
+  const runId = desk.runId;
+  const scanned = desk.events.some((e) => e.actor === "scanner" && e.kind === "output");
 
   const loadNotes = useCallback(() => api<Note[]>("/api/notes").then(setNotes).catch(() => {}), []);
   const loadNews = useCallback(() => api<Headline[]>("/api/news").then(setNews).catch(() => {}), []);
@@ -41,6 +50,10 @@ export function DeskProvider({ children }: { children: ReactNode }) {
   useEffect(() => { loadNotes(); loadNews(); loadMacro(); }, [loadNotes, loadNews, loadMacro]);
   useInterval(loadNews, 120_000);
   useInterval(loadMacro, 900_000);
+  useEffect(() => {
+    if (!runId) return;
+    api<UniverseAsset[]>(`/api/universe?run_id=${encodeURIComponent(runId)}`).then(setUniverse).catch(() => setUniverse([]));
+  }, [runId, scanned]);
 
   const act = useCallback(async (path: string, method = "POST", ok?: string, body?: unknown) => {
     try {
@@ -60,9 +73,11 @@ export function DeskProvider({ children }: { children: ReactNode }) {
   const dropNote = useCallback(async (id: number) => { if (await act(`/api/notes/${id}`, "DELETE")) loadNotes(); }, [act, loadNotes]);
   const runNow = useCallback(async () => { await act("/api/run", "POST", "Desk run started. Watch it on the Desk page."); }, [act]);
 
-  const watch = [...new Set(["BTC", "ETH", ...(desk.state?.watchlist ?? [])])];
+  const watch = universe.length
+    ? [...new Set(universe.map((u) => u.asset))]
+    : [...new Set(["BTC", "ETH", ...(desk.state?.watchlist ?? [])])];
 
-  return <DeskCtx.Provider value={{ ...desk, notes, addNote, dropNote, news, macro, runNow, act, watch }}>{children}</DeskCtx.Provider>;
+  return <DeskCtx.Provider value={{ ...desk, notes, addNote, dropNote, news, macro, runNow, act, watch, universe }}>{children}</DeskCtx.Provider>;
 }
 
 export function useDeskCtx() {

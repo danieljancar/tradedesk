@@ -3,6 +3,7 @@
 
 export type CastId = keyof typeof CAST_DEF;
 const CAST_DEF = {
+  scanner: { kind: "device", name: "Scanner", role: "Ranks the whole Binance spot market", base: "#8fe3d6", light: "#c9f4ec", dark: "#2a8f80" },
   prices: { kind: "device", name: "Prices", role: "Binance candles, funding, open interest", base: "#8fb8ff", light: "#cfe0ff", dark: "#3f63b0" },
   headlines: { kind: "device", name: "Headlines", role: "CoinDesk, Cointelegraph, Decrypt, The Block", base: "#ffc978", light: "#ffe4ba", dark: "#b47a1c" },
   book: { kind: "device", name: "Book", role: "Account, open trades, past lessons", base: "#c9b5ff", light: "#e6dcff", dark: "#6d55c4" },
@@ -18,6 +19,7 @@ const CAST_DEF = {
 export const CAST: Record<string, any> = CAST_DEF;
 
 export const ABOUT: Record<string, string> = {
+  scanner: "A data feed. Goes through every coin on Binance with enough volume and picks the few that moved most against Bitcoin or traded far above their usual volume. Those join your watchlist and gold for the day.",
   prices: "Not a character, a data feed. Pulls 4-hour, daily and weekly candles from Binance and turns them into averages, momentum, typical move size and key price levels.",
   headlines: "A data feed. Collects the last 36 hours of crypto headlines and sorts them by coin.",
   book: "The account's notebook: money available, open trades, recent results, and lessons the desk wrote after past trades.",
@@ -188,6 +190,10 @@ function device(id: string, c: any, flat: boolean) {
     prices: `<g transform="translate(-20 6)">${[[0, 10, -12, 4], [10, 4, -16, 2], [20, 8, -20, -6], [30, -2, -26, -12], [40, -8, -30, -16]]
       .map(([x, a, hi, b], i) => `<path d="M${x} ${hi} V${Math.max(a, b) + 8}" stroke="#1b2130" stroke-width="1.6"/>
         <rect class="bar" style="--i:${i}" x="${x - 3.5}" y="${Math.min(a, b) - 4}" width="7" height="${Math.abs(a - b) + 8}" rx="1.5" fill="${i === 1 ? "#ff6b6b" : "#2fbf71"}"/>`).join("")}</g>`,
+    scanner: `<g transform="translate(0 4)"><circle r="19" fill="#f4fffc" stroke="${c.dark}" stroke-width="1.6"/>
+        <circle r="11" fill="none" stroke="${c.dark}" stroke-opacity=".35" stroke-width="1.2"/><circle r="3" fill="${c.dark}"/>
+        <g class="sweep"><path d="M0 0 L0 -19 A19 19 0 0 1 16.5 -9.5 Z" fill="${c.dark}" fill-opacity=".22"/><path d="M0 0 L0 -19" stroke="${c.dark}" stroke-width="1.6"/></g>
+        <circle class="bar" style="--i:0" cx="9" cy="-6" r="2.4" fill="#2fbf71"/><circle class="bar" style="--i:1" cx="-8" cy="9" r="2.4" fill="#ff6b6b"/></g>`,
     headlines: `<g transform="translate(-22 -12)"><rect width="44" height="34" rx="3" fill="#fffdf6" stroke="${c.dark}" stroke-width="1.4"/>
         <rect x="5" y="5" width="20" height="6" rx="1" fill="#2c3140"/><g class="bar-lines" stroke="#b9b09a" stroke-width="1.8">
         <path class="bar" style="--i:0" d="M5 17 H39"/><path class="bar" style="--i:1" d="M5 23 H39"/><path class="bar" style="--i:2" d="M5 29 H27"/></g></g>`,

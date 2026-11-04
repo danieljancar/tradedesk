@@ -286,6 +286,8 @@
 .char .bar { transform-box: fill-box; transform-origin: 50% 100%; }
 .char.is-working .bar { animation: bars .7s ease-in-out infinite alternate; animation-delay: calc(var(--i) * .12s); }
 @keyframes bars { to { transform: scaleY(.45); } }
+.char .sweep { transform-box: view-box; transform-origin: 0 0; }
+.char.is-working .sweep { animation: spin 2s linear infinite; }
 
 /* portraits outside the floor */
 .portrait { overflow: visible; }
@@ -295,7 +297,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .char .breathe, .char.is-working .breathe, .char .zzz, .char .dots circle, .floor .edge.flow,
-  .char.is-working .paw, .char.is-working .screen-line, .char.is-working .dial, .char.is-working .bar,
+  .char.is-working .paw, .char.is-working .screen-line, .char.is-working .dial, .char.is-working .bar, .char.is-working .sweep,
   .char.is-working .bulb, .step.now .step-pip, .agent-wave svg { animation: none; }
   .char .lean, .char .pupil { transition: none; }
 }

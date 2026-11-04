@@ -15,6 +15,7 @@ import type { Candle } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const TFS = ["1h", "4h", "1d", "1w"] as const;
+const SOURCE: Record<string, string> = { scan: "found by the scan", gold: "gold", always: "always watched", core: "core holding", watchlist: "watchlist" };
 const ts = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
 function Toggle({ on, onClick, children, swatch }: { on: boolean; onClick: () => void; children: React.ReactNode; swatch?: string }) {
@@ -48,6 +49,9 @@ export default function Markets() {
   const [note, setNote] = useState("");
   const [hover, setHover] = useState<Candle | null>(null);
 
+  const byAsset = Object.fromEntries(d.universe.map((u) => [u.asset, u]));
+  const found = d.universe.filter((u) => u.source === "scan").length;
+  const pick = byAsset[asset];
   const f = d.facts?.[asset];
   const r = f?.frames ? readAsset(asset, f) : null;
   const t = ticks[asset];
@@ -105,14 +109,18 @@ export default function Markets() {
   return (
     <Page className="max-w-none">
       <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_340px]">
-        <Box title="Watchlist" pad={false} className="xl:self-start">
+        <Box title="Today's assets" right={found > 0 && <span className="text-xs text-dim">{found} from the scan</span>} pad={false} className="xl:self-start">
           <ul className="flex gap-1 overflow-x-auto p-1.5 xl:block xl:space-y-0.5">
             {d.watch.map((a) => {
               const k = ticks[a];
+              const u = byAsset[a];
               return (
                 <li key={a} className="shrink-0">
-                  <NavLink to={`/markets/${a}`} className={({ isActive }) => cn("flex items-center justify-between gap-3 rounded-md px-2.5 py-2 hover:bg-raised", (isActive || (!param && a === asset)) && "bg-raised")}>
-                    <span className="font-semibold">{a}</span>
+                  <NavLink to={`/markets/${a}`} title={u?.reason ?? undefined} className={({ isActive }) => cn("flex items-center justify-between gap-3 rounded-md px-2.5 py-2 hover:bg-raised", (isActive || (!param && a === asset)) && "bg-raised")}>
+                    <span>
+                      <span className="block font-semibold">{a}</span>
+                      {u && u.source !== "watchlist" && <span className="block text-[10px] font-medium text-dim">{SOURCE[u.source]}</span>}
+                    </span>
                     <span className="text-right">
                       <span className="block font-mono text-[13px] tabular-nums">{k ? px(k.price) : "–"}</span>
                       <span className={cn("block font-mono text-[11px] tabular-nums", k && (k.ch >= 0 ? "text-up" : "text-down"))}>{k ? pc(k.ch, 2) : ""}</span>
@@ -128,7 +136,7 @@ export default function Markets() {
           <section className="overflow-hidden rounded-xl border border-line bg-panel">
             <header className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-4 py-3">
               <div>
-                <p className="text-xs text-dim">{asset}/USDT</p>
+                <p className="text-xs text-dim">{asset}/USDT{pick?.asset_class === "gold" ? ", one token is one troy ounce of gold" : ""}</p>
                 <p className="font-mono text-2xl font-medium tabular-nums">{px(t?.price ?? f?.price)}
                   <span className={cn("ml-2 text-sm", t && (t.ch >= 0 ? "text-up" : "text-down"))}>{t ? pc(t.ch, 2) : ""}</span></p>
               </div>
@@ -141,7 +149,10 @@ export default function Markets() {
                   <div><dt className="text-dim">7 days, 30 days</dt><dd className="font-mono"><span className={f.change?.["7d"] >= 0 ? "text-up" : "text-down"}>{pc(f.change?.["7d"])}</span> <span className={f.change?.["30d"] >= 0 ? "text-up" : "text-down"}>{pc(f.change?.["30d"])}</span></dd></div>
                 </dl>
               )}
-              {hover && (
+              {pick?.reason && pick.source === "scan" && (
+              <p className="w-full rounded-md bg-brand-soft px-3 py-1.5 text-[13px] text-brand-strong">Picked by the scan: {pick.reason}</p>
+            )}
+            {hover && (
                 <p className="ml-auto font-mono text-[11px] text-dim">
                   O <span className="text-fg">{px(hover.open)}</span> H <span className="text-fg">{px(hover.high)}</span> L <span className="text-fg">{px(hover.low)}</span> C <span className="text-fg">{px(hover.close)}</span>
                 </p>

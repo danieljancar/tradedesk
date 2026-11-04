@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const W = 1200, H = 470;
 const POS: Record<string, [number, number]> = {
-  prices: [100, 115], headlines: [100, 240], book: [100, 365],
+  scanner: [100, 78], prices: [100, 178], headlines: [100, 278], book: [100, 378],
   technical: [345, 140], news: [345, 345],
   bull: [605, 140], bear: [605, 345],
   pm: [855, 242],
@@ -17,19 +17,19 @@ const LANES = [
   { x: 855, label: "Decision" }, { x: 1095, label: "Rules & orders" },
 ];
 const EDGES: [string, string][] = [
-  ["prices", "technical"], ["book", "technical"], ["headlines", "news"],
+  ["scanner", "technical"], ["prices", "technical"], ["book", "technical"], ["headlines", "news"],
   ["technical", "bull"], ["technical", "bear"], ["news", "bull"], ["news", "bear"],
   ["bull", "pm"], ["bear", "pm"], ["pm", "risk"], ["risk", "exchange"],
 ];
 export const STEPS = [
-  { id: "data", label: "Data", actors: ["prices", "headlines", "book"] },
+  { id: "data", label: "Data", actors: ["scanner", "prices", "headlines", "book"] },
   { id: "analysts", label: "Analysts", actors: ["technical", "news"] },
   { id: "debate", label: "Debate", actors: ["bull", "bear"] },
   { id: "decision", label: "Decision", actors: ["pm"] },
   { id: "risk", label: "Risk check", actors: ["risk", "exchange"] },
 ];
 export const START_LINES: Record<string, string> = {
-  prices: "Pulling candles and funding…", headlines: "Reading the news feeds…", book: "Opening the books…",
+  scanner: "Ranking every coin on Binance…", prices: "Pulling candles and funding…", headlines: "Reading the news feeds…", book: "Opening the books…",
   technical: "Studying the charts…", news: "Checking headlines and the calendar…",
   bull: "Looking for a reason to buy…", bear: "Looking for what could go wrong…",
   pm: "Weighing both sides…", risk: "Measuring every idea against the rules…", exchange: "Preparing orders…",
