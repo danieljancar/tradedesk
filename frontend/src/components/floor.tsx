@@ -4,13 +4,13 @@ import { CAST, figure, gradients, Rig } from "@/lib/cast";
 import type { DeskEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const W = 1200, H = 470;
+const W = 1200, H = 620;
 const POS: Record<string, [number, number]> = {
-  scanner: [100, 78], prices: [100, 178], headlines: [100, 278], book: [100, 378],
-  technical: [345, 140], news: [345, 345],
-  bull: [605, 140], bear: [605, 345],
-  pm: [855, 242],
-  risk: [1095, 140], exchange: [1095, 345],
+  scanner: [100, 96], prices: [100, 234], headlines: [100, 372], book: [100, 510],
+  technical: [345, 200], news: [345, 430],
+  bull: [605, 200], bear: [605, 430],
+  pm: [855, 315],
+  risk: [1095, 200], exchange: [1095, 430],
 };
 const LANES = [
   { x: 100, label: "Data" }, { x: 345, label: "Analysts" }, { x: 605, label: "Debate" },
@@ -38,6 +38,7 @@ export const said = (e: DeskEvent) => (e.kind === "start" && START_LINES[e.actor
 
 function edgePath(a: string, b: string) {
   const [x1, y1] = POS[a], [x2, y2] = POS[b];
+  if (x1 === x2) return `M${x1} ${y1 + 100} L${x2} ${y2 - 62}`;
   const sx = x1 + 54, ex = x2 - 56, mid = (sx + ex) / 2;
   return `M${sx} ${y1} C${mid} ${y1}, ${mid} ${y2}, ${ex} ${y2}`;
 }

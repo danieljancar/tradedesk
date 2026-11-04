@@ -32,11 +32,11 @@ const CLASS: Record<string, { label: string; color: string }> = {
 };
 const cls = (c: string) => CLASS[c] ?? { label: c, color: "var(--chart-3)" };
 
-function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+function Stat({ label, value, unit, sub, tone, className }: { label: string; value: string; unit?: string; sub?: string; tone?: string; className?: string }) {
   return (
-    <div className="bg-panel p-4">
+    <div className={cn("bg-panel p-4", className)}>
       <p className="text-xs text-dim">{label}</p>
-      <p className={cn("mt-1 font-mono text-2xl tabular-nums", tone)}>{value}</p>
+      <p className={cn("mt-1 font-mono text-2xl tabular-nums", tone)}>{value}{unit && <span className="ml-1.5 text-sm text-dim">{unit}</span>}</p>
       {sub && <p className="text-xs text-dim">{sub}</p>}
     </div>
   );
@@ -87,13 +87,13 @@ export default function Portfolio() {
           <p className="text-xs text-dim">
             {p.equity_base != null
               ? <>about <b className="font-mono text-fg">{px(p.equity_base)} {p.base_currency}</b> at {p.fx.rate?.toFixed(4)} ({p.fx.as_of})</>
-              : `${p.base_currency} value missing: ${p.fx.note ?? "no exchange rate"}`}
+              : `No ${p.base_currency} value right now, the exchange rate didn't load.`}
           </p>
         </div>
-        <Stat label="Trading sleeve" value={`${px(p.sleeves.active.value)} ${q}`} sub={`${p.sleeves.active.share.toFixed(0)}% of the account, used for active trades`} />
-        <Stat label="Core sleeve" value={coreOn ? `${px(p.sleeves.core.value)} ${q}` : "Off"}
+        <Stat label="Trading sleeve" value={px(p.sleeves.active.value)} unit={q} sub={`${p.sleeves.active.share.toFixed(0)}% of the account, used for active trades`} />
+        <Stat label="Core sleeve" value={coreOn ? px(p.sleeves.core.value) : "Off"} unit={coreOn ? q : undefined}
           sub={coreOn ? `${p.sleeves.core.share.toFixed(0)}% now, target ${p.sleeves.core.target_pct}%` : "Long-term holdings, set up in Settings"} />
-        <Stat label="Cash" value={`${px(cash?.value ?? 0)} ${q}`} sub={`${(cash?.share ?? 0).toFixed(0)}% not invested`} />
+        <Stat label="Cash" value={px(cash?.value ?? 0)} unit={q} sub={`${(cash?.share ?? 0).toFixed(0)}% not invested`} className="col-span-2 lg:col-span-1" />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -116,7 +116,7 @@ export default function Portfolio() {
               <tbody className="divide-y divide-line/60">
                 {p.allocation.by_asset.map((a) => (
                   <tr key={a.asset}>
-                    <td className="py-2 font-semibold">{a.asset === q ? <>{q} <span className="font-normal text-dim">free cash</span></> : <Link to={`/markets/${a.asset}`} className="hover:underline">{a.asset}</Link>}</td>
+                    <td className="py-2 font-semibold">{a.asset === q ? <>{q} <span className="font-normal text-dim">free cash</span></> : <Link to={`/markets/${a.asset}`} className="inline-block py-1 hover:underline">{a.asset}</Link>}</td>
                     <td className="py-2 text-right font-mono tabular-nums">{px(a.value)}</td>
                     <td className="py-2 text-right font-mono tabular-nums">{a.share.toFixed(1)}%</td>
                     <td className="hidden py-2 pl-4 sm:table-cell"><div className="h-1.5 rounded-full bg-sunk"><div className="h-full rounded-full bg-brand" style={{ width: `${a.share}%` }} /></div></td>

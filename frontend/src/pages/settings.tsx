@@ -25,7 +25,7 @@ function Chips({ items, onChange, placeholder }: { items: string[]; onChange: (v
       {items.map((a) => (
         <span key={a} className="flex items-center gap-1 rounded-full bg-raised py-1 pr-1.5 pl-3 text-sm font-medium">
           {a}
-          <button type="button" aria-label={`Remove ${a}`} onClick={() => onChange(items.filter((x) => x !== a))} className="rounded-full p-0.5 text-dim hover:bg-sunk hover:text-down"><X className="size-3.5" /></button>
+          <button type="button" aria-label={`Remove ${a}`} onClick={() => onChange(items.filter((x) => x !== a))} className="grid size-6 place-items-center rounded-full text-dim hover:bg-sunk hover:text-down"><X className="size-3.5" /></button>
         </span>
       ))}
       <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); const c = v.trim().toUpperCase(); if (c && !items.includes(c)) onChange([...items, c]); setV(""); }}>
@@ -126,7 +126,7 @@ export default function Settings() {
             {draft.watchlist.map((a: string) => (
               <span key={a} className="flex items-center gap-1 rounded-full bg-raised py-1 pr-1.5 pl-3 text-sm font-medium">
                 {a}
-                <button type="button" aria-label={`Remove ${a}`} onClick={() => setDraft({ ...draft, watchlist: draft.watchlist.filter((x: string) => x !== a) })} className="rounded-full p-0.5 text-dim hover:bg-sunk hover:text-down"><X className="size-3.5" /></button>
+                <button type="button" aria-label={`Remove ${a}`} onClick={() => setDraft({ ...draft, watchlist: draft.watchlist.filter((x: string) => x !== a) })} className="grid size-6 place-items-center rounded-full text-dim hover:bg-sunk hover:text-down"><X className="size-3.5" /></button>
               </span>
             ))}
             <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); const c = coin.trim().toUpperCase(); if (c && !draft.watchlist.includes(c)) setDraft({ ...draft, watchlist: [...draft.watchlist, c] }); setCoin(""); }}>
