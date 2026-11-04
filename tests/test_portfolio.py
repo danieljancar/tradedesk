@@ -118,7 +118,7 @@ def test_core_plans_skip_trade_rules_and_stay_out_of_the_active_book(core, marke
     assert book.sleeve_equity == pytest.approx(book.equity / 2)
     assert desk.rebalance(propose=True)["plans"] == []
     text = desk.write_book().read_text()
-    assert "## Core" in text and "closed trades" in text
+    assert "## Core" in text and "closed active trades" in text
 
 
 def test_core_buys_still_respect_pause_futures_and_cash(core, market):

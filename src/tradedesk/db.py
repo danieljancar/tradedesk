@@ -119,6 +119,11 @@ CREATE TABLE IF NOT EXISTS trims (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS run_universe (
+    run_id TEXT PRIMARY KEY,
+    assets TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS events_run ON events(run_id, id);
 CREATE INDEX IF NOT EXISTS plans_status ON plans(status);
 CREATE INDEX IF NOT EXISTS positions_status ON positions(status);
@@ -243,3 +248,12 @@ class Database:
             iso_ts,
         )
         return row["v"] if row else 0.0
+
+    def save_universe(self, run_id: str, assets: list[dict]) -> None:
+        self.upsert(
+            "run_universe", ("run_id",), run_id=run_id, assets=json.dumps(assets), created_at=now()
+        )
+
+    def run_universe(self, run_id: str) -> list[dict] | None:
+        row = self.one("SELECT assets FROM run_universe WHERE run_id = ?", run_id)
+        return json.loads(row["assets"]) if row else None

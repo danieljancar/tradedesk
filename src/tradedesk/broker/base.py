@@ -32,6 +32,14 @@ class Unprotected(RuntimeError):
     """A position is open on the exchange without a working stop."""
 
 
+class CloseFailed(RuntimeError):
+    """A close did not go through. refs are the stop and target that protect the coins again."""
+
+    def __init__(self, message: str, refs: dict):
+        super().__init__(message)
+        self.refs = refs
+
+
 def ms(iso: str) -> int:
     return int(datetime.fromisoformat(iso).timestamp() * 1000)
 

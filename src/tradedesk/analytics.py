@@ -99,14 +99,18 @@ def breakdown(rows: list[dict], key: str) -> dict[str, dict]:
     return {k: _group(v) for k, v in sorted(groups.items())}
 
 
-def trade_metrics(positions: list[dict]) -> dict:
-    rows = [p for p in positions if p["pnl"] is not None]
+def trade_metrics(positions: list[dict], sleeve: str | None = "active") -> dict:
+    """Headline numbers for one sleeve, core lots are rebalanced and not traded. Breakdowns
+    cover every sleeve."""
+    every = [p for p in positions if p["pnl"] is not None]
+    rows = [p for p in every if sleeve is None or (p.get("sleeve") or "active") == sleeve]
     n = len(rows)
     wins = [p for p in rows if p["pnl"] > 0]
     losses = [p for p in rows if p["pnl"] <= 0]
     gross_win = sum(p["pnl"] for p in wins)
     gross_loss = -sum(p["pnl"] for p in losses)
     return {
+        "sleeve": sleeve,
         "count": n,
         "win_rate": round(len(wins) / n, 3) if n else None,
         "profit_factor": round(gross_win / gross_loss, 2) if gross_loss > 0 else None,
@@ -116,7 +120,7 @@ def trade_metrics(positions: list[dict]) -> dict:
         "avg_loss_r": round(sum(map(r_multiple, losses)) / len(losses), 2) if losses else None,
         "avg_hold_hours": round(sum(map(_hours, rows)) / n, 1) if n else None,
         "by": {
-            key: breakdown(rows, key)
+            key: breakdown(every, key)
             for key in ("asset", "horizon", "side", "sleeve", "exit_reason")
         },
     }
@@ -252,10 +256,11 @@ def summary(data: dict) -> list[str]:
 
 
 def trade_line(t: dict, quote: str) -> str:
+    label = f"closed {t['sleeve']} trades" if t["sleeve"] else "closed trades"
     if not t["count"]:
-        return "closed trades: none yet"
+        return f"{label}: none yet"
     return (
-        f"closed trades: {t['count']}, win rate {t['win_rate']:.0%}, profit factor "
+        f"{label}: {t['count']}, win rate {t['win_rate']:.0%}, profit factor "
         f"{_num(t['profit_factor'], '.2f')}, expectancy {t['expectancy_r']:+.2f}R "
         f"({t['expectancy_quote']:+.2f} {quote}), avg hold {t['avg_hold_hours']:.0f}h"
     )

@@ -51,17 +51,18 @@ def bot(settings, db, market, tmp_path):
     )
 
 
-def message(text: str, chat: int = 42, uid: int = 1) -> dict:
-    return {"update_id": uid, "message": {"chat": {"id": chat}, "text": text}}
+def message(text: str, chat: int = 42, uid: int = 1, kind: str = "private") -> dict:
+    return {"update_id": uid, "message": {"chat": {"id": chat, "type": kind}, "text": text}}
 
 
-def press(data: str, chat: int = 42, uid: int = 1) -> dict:
+def press(data: str, chat: int = 42, uid: int = 1, kind: str = "private", sender: int = 42) -> dict:
     return {
         "update_id": uid,
         "callback_query": {
             "id": "cb",
             "data": data,
-            "message": {"message_id": 55, "chat": {"id": chat}},
+            "from": {"id": sender},
+            "message": {"message_id": 55, "chat": {"id": chat, "type": kind}},
         },
     }
 
@@ -105,6 +106,24 @@ def test_other_chats_are_ignored(bot, api, tmp_path):
     bot.handle({"update_id": 3, "edited_message": {"chat": {"id": 42}, "text": "/status"}})
     assert bot.desk.db.one("SELECT status FROM plans")["status"] == "proposed"
     assert not api.send.called and not api.edit.called and not api.answer.called
+
+
+def test_groups_and_other_senders_are_ignored(bot, api, tmp_path):
+    plan_id = proposed(bot, tmp_path)
+    bot.handle(press(f"approve:{plan_id}", kind="group"))
+    bot.handle(press(f"approve:{plan_id}", sender=7))
+    bot.handle(message("/status", kind="supergroup"))
+    assert bot.desk.db.one("SELECT status FROM plans")["status"] == "proposed"
+    assert not api.send.called and not api.edit.called
+
+
+def test_approve_sends_only_that_plan(bot, api, tmp_path):
+    first = proposed(bot, tmp_path)
+    bot.desk.approve(first)
+    second = proposed(bot, tmp_path, horizon="short", entry_type="market", take_profit=113)
+    bot.handle(press(f"approve:{second}"))
+    statuses = dict((r["id"], r["status"]) for r in bot.desk.db.all("SELECT * FROM plans"))
+    assert statuses == {first: "approved", second: "open"}
 
 
 def test_kill_asks_then_cancels_without_flatten(bot, api, tmp_path):

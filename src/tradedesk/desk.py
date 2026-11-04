@@ -7,10 +7,12 @@ from pathlib import Path
 from tradedesk import analytics, learning, news, notes, portfolio, risk, snapshot, universe
 from tradedesk.binance import market_data
 from tradedesk.broker import Broker, Fill, make_broker
-from tradedesk.broker.base import Unprotected
+from tradedesk.broker.base import CloseFailed, Unprotected
 from tradedesk.config import Horizon, Market, Settings
 from tradedesk.db import Database, now
 from tradedesk.models import PlanFile, TradeIdea
+
+CORE_ACTION = "core lots change only through rebalancing"
 
 
 class Desk:
@@ -83,6 +85,7 @@ class Desk:
         if not self.settings.universe.enabled:
             assets = universe.watchlist(self.settings)
             universe.write(run_dir, assets)
+            self.db.save_universe(run_dir.name, assets)
             self.log("scanner", "output", "Scan is off, using the watchlist")
             return run_dir / "universe.md"
         self.log("scanner", "start", f"Scanning {self.settings.quote} spot pairs")
@@ -93,6 +96,7 @@ class Desk:
             scanned = []
         assets = universe.assets_for_run(self.settings, scanned, extra)
         text = universe.write(run_dir, assets)
+        self.db.save_universe(run_dir.name, assets)
         found = [a["asset"] for a in assets if a["source"] == "scan"]
         title = f"{len(assets)} assets, from the scan: {', '.join(found) or 'none'}"
         self.log("scanner", "output", title, text)
@@ -100,7 +104,7 @@ class Desk:
 
     def run_assets(self) -> list[dict]:
         run_id = self.run_id()
-        saved = universe.read(self.run_dir(run_id)) if run_id else None
+        saved = self.db.run_universe(run_id) if run_id else None
         if not saved or not self.settings.universe.enabled:
             return universe.watchlist(self.settings)
         return saved
@@ -126,7 +130,8 @@ class Desk:
         self.log("headlines", "output", f"{count} headlines sorted by asset", text)
         return run_dir / "news.md"
 
-    def book(self) -> risk.Book:
+    def book(self, exclude: int | None = None) -> risk.Book:
+        """Account state for sizing. exclude leaves one plan out, to re-check it before placing."""
         equity = self.broker.equity()
         self.db.record_equity(equity)
         open_risk, taken, count = 0.0, set(), 0
@@ -140,7 +145,8 @@ class Desk:
             open_risk += max(0.0, (p["entry_price"] - p["stop"]) * sign) * p["qty"]
             taken.add((p["asset"], p["horizon"]))
             count += 1
-        for p in self.db.pending_plans():
+        pending = [p for p in self.db.pending_plans() if p["id"] != exclude]
+        for p in pending:
             if p["sleeve"] == "core":
                 continue
             open_risk += p["risk_amount"] or 0
@@ -154,10 +160,17 @@ class Desk:
             | set(self.settings.portfolio.core_targets)
         )
         day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0).isoformat()
-        core_pct = self.settings.portfolio.core_pct
+        core_pct = 0.0 if futures else self.settings.portfolio.core_pct
+        free = self.broker.free_quote()
+        if not futures:
+            free -= sum(
+                (p["qty"] or 0) * p["entry"]
+                for p in pending
+                if p["status"] == "approved" and not p["exchange"]
+            )
         return risk.Book(
             equity=equity,
-            free_quote=self.broker.free_quote(),
+            free_quote=free,
             peak_equity=self.db.peak_equity() or equity,
             day_pnl=self.db.realized_since(day_start),
             open_risk=open_risk,
@@ -333,6 +346,9 @@ class Desk:
                 "status": "rejected",
                 "reasons": ["no open position with that id"],
             }
+        if pos["sleeve"] == "core":
+            self.log("risk", "reject", f"Action on core position {pos['id']} refused", CORE_ACTION)
+            return {"position": pos["id"], "status": "rejected", "reasons": [CORE_ACTION]}
         if action["action"] == "close":
             self.close(pos["id"], action["reason"])
             return {"position": pos["id"], "status": "closed", "reasons": []}
@@ -360,18 +376,91 @@ class Desk:
         plan = self.db.one("SELECT * FROM plans WHERE id = ?", plan_id)
         if plan is None or plan["status"] != "proposed":
             raise ValueError(f"plan {plan_id} is not waiting for approval")
+        if self._stale(plan):
+            self.db.update("plans", plan_id, status="expired", updated_at=now())
+            hours = self.settings.execution.entry_ttl_hours
+            raise ValueError(f"plan {plan_id} is older than {hours}h, it expired unapproved")
         self.db.update("plans", plan_id, status="approved", updated_at=now())
         self.log("desk", "approve", f"Plan {plan_id} approved ({plan['asset']} {plan['side']})")
+
+    def _stale(self, plan: dict) -> bool:
+        ttl = timedelta(hours=self.settings.execution.entry_ttl_hours)
+        return datetime.now(UTC) - datetime.fromisoformat(plan["created_at"]) > ttl
+
+    def expire_proposals(self) -> list[str]:
+        out = []
+        for plan in self.db.all("SELECT * FROM plans WHERE status = 'proposed'"):
+            if self._stale(plan):
+                self.db.update("plans", plan["id"], status="expired", updated_at=now())
+                out.append(f"plan {plan['id']} expired unapproved")
+        return out
+
+    def recheck(self, plan: dict) -> risk.Verdict:
+        """The risk check again with the account as it is now, right before an order goes out."""
+        book = self.book(exclude=plan["id"])
+        price = self.broker.price(plan["symbol"])
+        rules = self.broker.rules(plan["symbol"])
+        if plan["sleeve"] == "core":
+            row = {"price": price, "qty": plan["qty"] or 0}
+            return portfolio.size_buy(self.settings, book, row, rules)
+        idea = TradeIdea(
+            asset=plan["asset"],
+            horizon=plan["horizon"],
+            side=plan["side"],
+            rating=plan["rating"],
+            entry_type=plan["entry_type"],
+            entry=plan["entry"],
+            stop=plan["stop"],
+            take_profit=plan["take_profit"],
+            confidence=plan["confidence"],
+            thesis=plan["thesis"],
+            invalidation=plan["invalidation"],
+        )
+        atr = risk.horizon_atr(idea.horizon, self._facts().get(idea.asset, {}))
+        return risk.check(idea, self.settings, book, price, atr, rules)
+
+    def _cleared(self, plan: dict) -> dict | None:
+        """The plan sized to the fresh check, or None after marking it rejected."""
+        try:
+            verdict = self.recheck(plan)
+        except Exception as e:
+            verdict = risk.Verdict(False, [f"no market data: {e}"])
+        if not verdict.ok:
+            reasons = "; ".join(verdict.reasons)
+            self.db.update(
+                "plans", plan["id"], status="rejected", reasons=reasons, updated_at=now()
+            )
+            self.log(
+                "risk",
+                "reject",
+                f"Plan {plan['id']} failed the check before placing",
+                "\n".join(verdict.reasons),
+                refs=[f"plan:{plan['id']}"],
+            )
+            return None
+        qty = min(plan["qty"] or 0, verdict.qty)
+        if qty != plan["qty"]:
+            self.db.update("plans", plan["id"], qty=qty, updated_at=now())
+        return plan | {"qty": qty}
 
     def reject(self, plan_id: int) -> None:
         self.db.update("plans", plan_id, status="cancelled", updated_at=now())
         self.log("desk", "reject", f"Plan {plan_id} dropped")
 
-    def execute(self) -> list[str]:
-        out = portfolio.execute_trims(self)
-        for plan in self.db.all("SELECT * FROM plans WHERE status = 'approved'"):
-            if plan["exchange"]:
+    def execute(self, only: int | None = None, trim: int | None = None) -> list[str]:
+        """Send approved trims and plans. only or trim limits it to that one plan or trim."""
+        out = portfolio.execute_trims(self, trim) if only is None else []
+        if trim is not None:
+            return out
+        approved = self.db.all("SELECT * FROM plans WHERE status = 'approved' ORDER BY id")
+        for plan in approved:
+            if plan["exchange"] or (only is not None and plan["id"] != only):
                 continue
+            checked = self._cleared(plan)
+            if checked is None:
+                out.append(f"plan {plan['id']}: rejected by the risk check before placing")
+                continue
+            plan = checked
             try:
                 placed = self.broker.place(plan)
             except Exception as e:
@@ -441,7 +530,7 @@ class Desk:
         return position_id
 
     def sync(self) -> list[str]:
-        out = []
+        out = self.expire_proposals()
         for plan in self.db.all("SELECT * FROM plans WHERE status = 'placed'"):
             try:
                 out += self._sync_entry(plan)
@@ -533,7 +622,12 @@ class Desk:
         pos = self.db.one("SELECT * FROM positions WHERE id = ? AND status = 'open'", position_id)
         if pos is None:
             raise ValueError(f"position {position_id} is not open")
-        exit_ = self.broker.close(pos)
+        try:
+            exit_ = self.broker.close(pos)
+        except CloseFailed as e:
+            self.db.update("positions", position_id, exchange=json.dumps(e.refs))
+            self.log("exchange", "error", f"Close of {pos['asset']} failed, stop put back", str(e))
+            raise
         self._close_position(pos, exit_.price, reason, exit_.pnl)
 
     def kill(self, flatten: bool) -> list[str]:

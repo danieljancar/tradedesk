@@ -96,20 +96,13 @@ def rebalance(
     return rows
 
 
-def paused(settings: Settings, book: risk.Book) -> str | None:
-    limit = settings.risk.max_drawdown_pct
-    if book.peak_equity and (1 - book.equity / book.peak_equity) * 100 >= limit:
-        return f"drawdown from peak is above {limit}%, desk is paused"
-    return None
-
-
 def size_buy(settings: Settings, book: risk.Book, row: dict, rules: SymbolRules) -> risk.Verdict:
-    """Core buys skip the trade rules but not exchange minimums, free cash or the pause."""
+    """Core buys skip the trade rules but not exchange minimums, free cash, the daily loss limit
+    or the drawdown pause."""
     reasons = []
     if settings.market is Market.FUTURES:
         reasons.append("the core sleeve needs market = spot, futures net every symbol")
-    if why := paused(settings, book):
-        reasons.append(why)
+    reasons += risk.account_blocks(settings, book)
     price = row["price"]
     stop = rules.price(price * (1 - settings.portfolio.core_stop_pct / 100))
     take_profit = rules.price(price * TARGET_MULT)
@@ -135,7 +128,8 @@ def size_buy(settings: Settings, book: risk.Book, row: dict, rules: SymbolRules)
 
 def holdings(db: Database) -> list[dict]:
     lots = db.all(
-        "SELECT id, asset, qty, opened_at FROM positions WHERE status = 'open' AND sleeve = 'core'"
+        "SELECT id, asset, qty, opened_at FROM positions WHERE status = 'open' AND sleeve = 'core' "
+        "AND id NOT IN (SELECT position_id FROM trims WHERE status = 'approved')"
     )
     lots += [
         {"id": None, "asset": p["asset"], "qty": p["qty"] or 0, "opened_at": p["created_at"]}
@@ -246,6 +240,9 @@ def propose(desk: Desk) -> dict:
     book = desk.book()
     rows = current(desk, book.equity)
     plans, trims = [], []
+    if s.market is Market.FUTURES:
+        desk.log("desk", "output", "Rebalance skipped, the core sleeve needs market = spot")
+        return {"rows": rows, "plans": [], "trims": []}
     for row in rows:
         if row["action"] == "buy":
             plans.append(_buy_plan(desk, run_id, row, book))
@@ -256,7 +253,8 @@ def propose(desk: Desk) -> dict:
             if p["status"] == "proposed":
                 desk.approve(p["id"])
         for t in trims:
-            approve_trim(desk, t["id"])
+            if t["asset"] in s.portfolio.core_targets:
+                approve_trim(desk, t["id"])
     text = report(s, book.equity, rows, plans, trims)
     (desk.run_dir(run_id) / "rebalance.md").write_text(text)
     desk.log("desk", "output", f"Rebalance: {len(plans)} buys, {len(trims)} trims", text)
@@ -333,9 +331,11 @@ def reject_trim(desk: Desk, trim_id: int) -> None:
     desk.log("desk", "reject", f"Trim {trim_id} dropped")
 
 
-def execute_trims(desk: Desk) -> list[str]:
+def execute_trims(desk: Desk, only: int | None = None) -> list[str]:
     out = []
     for t in desk.db.all("SELECT * FROM trims WHERE status = 'approved' ORDER BY id"):
+        if only is not None and t["id"] != only:
+            continue
         try:
             desk.close(t["position_id"], "core rebalance")
         except Exception as e:
@@ -361,7 +361,7 @@ def pending(db: Database) -> dict:
 def state(desk: Desk, fx: dict) -> dict:
     """Equity in quote and base currency, sleeves, allocation, core drift, pending rebalances."""
     s = desk.settings
-    equity, free = desk.broker.equity(), desk.broker.free_quote()
+    equity = desk.broker.equity()
     by_asset: dict[str, float] = {}
     core_value = 0.0
     for p in desk.db.open_positions():
@@ -369,7 +369,9 @@ def state(desk: Desk, fx: dict) -> dict:
         by_asset[p["asset"]] = by_asset.get(p["asset"], 0.0) + value
         if p["sleeve"] == "core":
             core_value += value
-    by_asset[s.quote] = by_asset.get(s.quote, 0.0) + max(0.0, free)
+    quote_balance = getattr(desk.broker, "quote_balance", None)
+    cash = quote_balance() if quote_balance else equity - sum(by_asset.values())
+    by_asset[s.quote] = by_asset.get(s.quote, 0.0) + max(0.0, cash)
     total = sum(by_asset.values()) or 1.0
     by_class: dict[str, float] = {}
     for asset, value in by_asset.items():

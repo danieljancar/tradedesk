@@ -4,17 +4,23 @@ import httpx
 
 from tradedesk.binance.client import BinanceError, Client
 from tradedesk.binance.market import MarketData, SymbolRules
-from tradedesk.broker.base import Exit, Fill, Placed, Unprotected
+from tradedesk.broker.base import CloseFailed, Exit, Fill, Placed, Unprotected
 from tradedesk.config import Settings
 from tradedesk.db import Database, now
 from tradedesk.risk import SPOT_FEE_BUFFER as FEE_BUFFER
 
 DEAD = ("CANCELED", "EXPIRED", "REJECTED", "EXPIRED_IN_MATCH")
+FEE = 0.001
 
 
 def avg_price(order: dict) -> float:
     qty = float(order["executedQty"])
     return float(order["cummulativeQuoteQty"]) / qty if qty else 0.0
+
+
+def net_pnl(entry: float, price: float, qty: float) -> float:
+    """Long spot pnl after an estimated 0.1% fee on the buy and on the sell, like paper."""
+    return (price - entry) * qty - (price + entry) * qty * FEE
 
 
 def client_id(plan: dict) -> str:
@@ -47,7 +53,9 @@ class SpotBroker:
     def equity(self) -> float:
         bal = self._balances()
         total = bal.get(self.settings.quote, 0.0)
-        held = {p["asset"] for p in self.db.open_positions()} if self.db else set()
+        held = set()
+        if self.db:
+            held = {p["asset"] for p in [*self.db.open_positions(), *self.db.pending_plans()]}
         tracked = {
             a.upper() for a in [*self.settings.watchlist, *self.settings.portfolio.core_targets]
         }
@@ -59,6 +67,10 @@ class SpotBroker:
 
     def free_quote(self) -> float:
         return self._balances().get(f"{self.settings.quote}:free", 0.0)
+
+    def quote_balance(self) -> float:
+        """Free and locked quote, the cash line of the allocation."""
+        return self._balances().get(self.settings.quote, 0.0)
 
     def _exit_qty(self, symbol: str, qty: float) -> float:
         return self.rules(symbol).qty(qty * (1 - FEE_BUFFER))
@@ -203,7 +215,7 @@ class SpotBroker:
         for leg, order in legs.items():
             if order["status"] == "FILLED":
                 price = avg_price(order)
-                pnl = (price - position["entry_price"]) * float(order["executedQty"])
+                pnl = net_pnl(position["entry_price"], price, float(order["executedQty"]))
                 return Exit(price=price, reason=leg, pnl=pnl)
         statuses = {o["status"] for o in legs.values()}
         if "PARTIALLY_FILLED" in statuses or statuses <= set(DEAD):
@@ -218,17 +230,30 @@ class SpotBroker:
                 raise
 
     def close(self, position: dict) -> Exit:
+        symbol, qty = position["symbol"], position["qty"]
         try:
             done = self.exit_status(position)
         except Unprotected:
             done = None
+            asset = position.get("asset") or symbol.removesuffix(self.settings.quote)
+            free = self._balances().get(f"{asset}:free", 0.0)
+            qty = self.rules(symbol).qty(min(qty, free))
         if done:
             return done
-        self._cancel_list(position["symbol"], json.loads(position["exchange"])["list"])
-        price = avg_price(self._sell(position["symbol"], position["qty"]))
-        return Exit(
-            price=price, reason="manual", pnl=(price - position["entry_price"]) * position["qty"]
-        )
+        self._cancel_list(symbol, json.loads(position["exchange"])["list"])
+        try:
+            order = self._sell(symbol, qty)
+        except Exception as e:
+            try:
+                refs = self._oco(symbol, qty, position["stop"], position["take_profit"])
+            except Exception as again:
+                raise Unprotected(
+                    f"{symbol} sell failed ({e}) and the stop did not go back"
+                ) from again
+            raise CloseFailed(f"{symbol} sell failed: {e}", refs) from e
+        price = avg_price(order)
+        sold = float(order.get("executedQty") or qty)
+        return Exit(price=price, reason="manual", pnl=net_pnl(position["entry_price"], price, sold))
 
     def move_stop(self, position: dict, stop: float) -> dict:
         symbol, qty, target = position["symbol"], position["qty"], position["take_profit"]

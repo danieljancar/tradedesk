@@ -43,7 +43,9 @@ class PaperBroker:
         if self.settings.market is Market.FUTURES:
             return self.equity()
         held = sum(p["qty"] * p["entry_price"] for p in self.db.open_positions())
-        waiting = sum(p["qty"] * p["entry"] for p in self.db.pending_plans())
+        waiting = sum(
+            p["qty"] * p["entry"] for p in self.db.pending_plans() if p["status"] == "placed"
+        )
         return self.equity() - held - waiting
 
     def place(self, plan: dict) -> Placed:

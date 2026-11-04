@@ -194,7 +194,7 @@ def create_app(desk: Desk) -> FastAPI:
             desk.approve(plan_id)
         except ValueError as e:
             raise HTTPException(409, str(e)) from e
-        return {"result": desk.execute()}
+        return {"result": desk.execute(only=plan_id)}
 
     @app.post("/api/plans/{plan_id}/reject")
     def reject(plan_id: int, x_desk: str | None = Header(None)) -> dict:
@@ -311,7 +311,7 @@ def create_app(desk: Desk) -> FastAPI:
             portfolio.approve_trim(desk, trim_id)
         except ValueError as e:
             raise HTTPException(409, str(e)) from e
-        return {"result": desk.execute()}
+        return {"result": desk.execute(trim=trim_id)}
 
     @app.post("/api/trims/{trim_id}/reject")
     def reject_trim(trim_id: int, x_desk: str | None = Header(None)) -> dict:

@@ -76,12 +76,21 @@ class Bot:
         return len(updates)
 
     def mine(self, chat: dict | None) -> bool:
-        return chat is not None and str(chat.get("id")) == self.telegram.chat_id
+        """Only the owner's private chat. Groups are ignored even when their id matches."""
+        return (
+            chat is not None
+            and chat.get("type") == "private"
+            and str(chat.get("id")) == self.telegram.chat_id
+        )
 
     def handle(self, update: dict) -> None:
         if "callback_query" in update:
             query = update["callback_query"]
-            if self.mine((query.get("message") or {}).get("chat")):
+            sender = str((query.get("from") or {}).get("id"))
+            if (
+                self.mine((query.get("message") or {}).get("chat"))
+                and sender == self.telegram.chat_id
+            ):
                 self.callback(query)
             return
         message = update.get("message") or {}
@@ -148,7 +157,7 @@ class Bot:
             self.desk.approve(plan_id)
         except ValueError:
             return "Not waiting", f"{text}\n\nAlready {e(plan['status'])}, nothing done."
-        result = [r for r in self.desk.execute() if r.startswith(f"plan {plan_id}:")]
+        result = self.desk.execute(only=plan_id)
         detail = e("; ".join(result) or "approved, waiting for the next execute")
         return "Approved", f"{text}\n\n<b>Approved</b>, {detail}"
 

@@ -72,7 +72,11 @@ def update(changes: dict) -> Settings:
             raise ValueError(f"{key} can only be changed in {path.name} by hand")
         if key == "risk" and isinstance(value, dict) and _switches_profile(current, value):
             base = RiskLimits.model_validate({"profile": value.get("profile")}).model_dump()
-            merged[key] = {k: v for k, v in value.items() if k == "profile" or v != base.get(k)}
+            table = current.get(key, {})
+            kept = {
+                k: v for k, v in value.items() if k == "profile" or k in table or v != base.get(k)
+            }
+            merged[key] = {**table, **kept}
         elif key in EDITABLE_TABLES and isinstance(value, dict):
             table = current.get(key, {})
             # a value the client only echoed back, unchanged and never set in the file, stays unset

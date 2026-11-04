@@ -36,8 +36,8 @@ class RiskLimits(BaseModel):
     max_position_pct: float = Field(25.0, gt=0, le=100)
     max_leverage: int = Field(3, ge=1, le=20)
     min_reward_risk: float = Field(2.0, ge=1)
-    daily_loss_limit_pct: float = Field(3.0, gt=0)
-    max_drawdown_pct: float = Field(15.0, gt=0)
+    daily_loss_limit_pct: float = Field(3.0, gt=0, le=25)
+    max_drawdown_pct: float = Field(15.0, gt=0, le=50)
     min_stop_atr: float = Field(0.5, ge=0)
     max_stop_pct: float = Field(15.0, gt=0)
     min_confidence: int = Field(60, ge=0, le=100)
@@ -123,7 +123,11 @@ class Portfolio(BaseModel):
     @field_validator("core_targets")
     @classmethod
     def weights(cls, v: dict[str, float]) -> dict[str, float]:
+        from tradedesk.universe import STABLES
+
         v = {k.strip().upper(): float(w) for k, w in v.items()}
+        if cash := sorted(set(v) & STABLES):
+            raise ValueError(f"core targets can't hold cash or stablecoins: {', '.join(cash)}")
         if any(w <= 0 for w in v.values()):
             raise ValueError("core target weights must be above 0")
         if v and abs(sum(v.values()) - 100) > 0.01:
@@ -159,6 +163,12 @@ class Settings(BaseModel):
     universe: Universe = Universe()
     notify: Notify = Notify()
     portfolio: Portfolio = Portfolio()
+
+    @model_validator(mode="after")
+    def core_not_quote(self) -> "Settings":
+        if self.quote.upper() in self.portfolio.core_targets:
+            raise ValueError(f"core targets can't hold the quote currency {self.quote}")
+        return self
 
     def symbol(self, asset: str) -> str:
         return f"{asset.upper()}{self.quote}"
