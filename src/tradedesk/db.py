@@ -106,13 +106,30 @@ CREATE TABLE IF NOT EXISTS outcomes (
     change_7d REAL,
     above_ema200_1d INTEGER
 );
+CREATE TABLE IF NOT EXISTS trims (
+    id INTEGER PRIMARY KEY,
+    run_id TEXT,
+    position_id INTEGER NOT NULL REFERENCES positions(id),
+    asset TEXT NOT NULL,
+    qty REAL NOT NULL,
+    price REAL NOT NULL,
+    value REAL NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS events_run ON events(run_id, id);
 CREATE INDEX IF NOT EXISTS plans_status ON plans(status);
 CREATE INDEX IF NOT EXISTS positions_status ON positions(status);
 """
-COLUMNS = {
-    "outcomes": {"source": "TEXT", "asset_class": "TEXT"},
-}
+# (table, column, definition) added to databases created before the column existed
+COLUMNS = [
+    ("outcomes", "source", "TEXT"),
+    ("outcomes", "asset_class", "TEXT"),
+    ("plans", "sleeve", "TEXT NOT NULL DEFAULT 'active'"),
+    ("positions", "sleeve", "TEXT NOT NULL DEFAULT 'active'"),
+]
 
 
 def now() -> str:
@@ -129,12 +146,11 @@ class Database:
         self.migrate()
 
     def migrate(self) -> None:
-        for table, columns in COLUMNS.items():
+        for table, column, definition in COLUMNS:
             have = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
-            for name, kind in columns.items():
-                if name not in have:
-                    self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
-        self.conn.commit()
+            if column not in have:
+                with self.tx() as c:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:

@@ -14,6 +14,7 @@ watchlist = ["BTC", "ETH", "SOL"]
 paper_equity = 1000.0
 
 [risk]
+# profile = "balanced"         # conservative, balanced or aggressive; keys set below still win
 risk_per_trade_pct = 1.0       # loss at the stop, as % of equity
 max_open_positions = 4         # positions plus resting entries
 max_total_risk_pct = 4.0       # all open stops together
@@ -50,3 +51,10 @@ include_gold = true           # add PAXG as gold
 telegram = false   # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
 events = ["proposed", "fill", "exit", "error", "run", "kill"]
 quiet_hours = ""   # e.g. "23-07" local time; then only errors and stop-outs come through
+
+[portfolio]
+core_pct = 0.0                 # share of equity held long term in the core sleeve, 0 is off
+core_targets = {}              # core weights in %, adding up to 100, e.g. { BTC = 60, PAXG = 40 }
+rebalance_band_pct = 5.0       # rebalance an asset when it drifts this far from its own target
+core_stop_pct = 35.0           # wide exchange stop under every core buy
+base_currency = "CHF"          # equity is also shown in this currency (FRED rate, USDT as USD)

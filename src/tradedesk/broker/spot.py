@@ -48,8 +48,11 @@ class SpotBroker:
         bal = self._balances()
         total = bal.get(self.settings.quote, 0.0)
         held = {p["asset"] for p in self.db.open_positions()} if self.db else set()
-        for asset in {a.upper() for a in self.settings.watchlist} | held:
-            amount = bal.get(asset.upper(), 0.0)
+        tracked = {
+            a.upper() for a in [*self.settings.watchlist, *self.settings.portfolio.core_targets]
+        }
+        for asset in tracked | held:
+            amount = bal.get(asset, 0.0)
             if amount:
                 total += amount * self.price(self.settings.symbol(asset))
         return total
