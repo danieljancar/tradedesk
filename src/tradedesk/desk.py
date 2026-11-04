@@ -2,7 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from tradedesk import learning, news, notes, risk, snapshot
+from tradedesk import analytics, learning, news, notes, portfolio, risk, snapshot
 from tradedesk.binance import market_data
 from tradedesk.broker import Broker, Fill, make_broker
 from tradedesk.broker.base import Unprotected
@@ -80,24 +80,34 @@ class Desk:
     def book(self) -> risk.Book:
         equity = self.broker.equity()
         self.db.record_equity(equity)
-        open_risk, taken = 0.0, set()
+        open_risk, taken, count = 0.0, set(), 0
+        futures = self.settings.market is Market.FUTURES
         for p in self.db.open_positions():
+            if p["sleeve"] == "core":
+                if futures:
+                    taken.add((p["asset"], p["horizon"]))
+                continue
             sign = 1 if p["side"] == "long" else -1
             open_risk += max(0.0, (p["entry_price"] - p["stop"]) * sign) * p["qty"]
             taken.add((p["asset"], p["horizon"]))
-        pending = self.db.pending_plans()
-        for p in pending:
+            count += 1
+        for p in self.db.pending_plans():
+            if p["sleeve"] == "core":
+                continue
             open_risk += p["risk_amount"] or 0
             taken.add((p["asset"], p["horizon"]))
+            count += 1
         day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0).isoformat()
+        core_pct = self.settings.portfolio.core_pct
         return risk.Book(
             equity=equity,
             free_quote=self.broker.free_quote(),
             peak_equity=self.db.peak_equity() or equity,
             day_pnl=self.db.realized_since(day_start),
             open_risk=open_risk,
-            open_count=len(self.db.open_positions()) + len(pending),
+            open_count=count,
             taken=taken,
+            sleeve_equity=equity * (1 - core_pct / 100) if core_pct > 0 else None,
         )
 
     def write_book(self) -> Path:
@@ -116,6 +126,12 @@ class Desk:
             "max hold days: "
             + ", ".join(f"{k} {v}" for k, v in self.settings.hold_days.model_dump().items()),
         ]
+        lines += analytics.book_lines(self.db, self.settings.quote)
+        if b.sleeve_equity is not None:
+            lines.append(
+                f"active sleeve equity {b.sleeve_equity:.2f}: trade sizes, open risk and the "
+                "position cap use this, daily loss and drawdown use total equity"
+            )
         blocks = risk.account_blocks(self.settings, b)
         if blocks:
             lines.append("NEW TRADES BLOCKED: " + "; ".join(blocks))
@@ -150,6 +166,7 @@ class Desk:
             )
         if not closed:
             lines.append("- none yet")
+        lines += portfolio.book_lines(self, b.equity)
         lines += notes.book_lines(self.db)
         lessons = self.settings.path(Path("lessons.md"))
         lines.append("## Lessons from past reviews")
@@ -294,7 +311,7 @@ class Desk:
         self.log("desk", "reject", f"Plan {plan_id} dropped")
 
     def execute(self) -> list[str]:
-        out = []
+        out = portfolio.execute_trims(self)
         for plan in self.db.all("SELECT * FROM plans WHERE status = 'approved'"):
             if plan["exchange"]:
                 continue
@@ -354,6 +371,7 @@ class Desk:
             initial_stop=plan["stop"],
             opened_at=fill.at,
             exchange=json.dumps(fill.refs or json.loads(plan["exchange"] or "{}")),
+            sleeve=plan.get("sleeve") or "active",
         )
         self.db.update("plans", plan["id"], status="open", updated_at=now())
         self.log(
@@ -425,6 +443,8 @@ class Desk:
         if exit_:
             self._close_position(pos, exit_.price, exit_.reason, exit_.pnl)
             return [f"position {pos['id']} closed by {exit_.reason} at {exit_.price:g}"]
+        if pos["sleeve"] == "core":
+            return []
         max_days = self.settings.hold_days.days(Horizon(pos["horizon"]))
         held = datetime.now(UTC) - datetime.fromisoformat(pos["opened_at"])
         if self.settings.execution.close_expired and held > timedelta(days=max_days):
@@ -471,9 +491,21 @@ class Desk:
                 continue
             self.db.update("plans", plan["id"], status="cancelled", updated_at=now())
             out.append(f"plan {plan['id']} cancelled")
+        with self.db.tx() as c:
+            c.execute(
+                "UPDATE trims SET status = 'cancelled', updated_at = ? "
+                "WHERE status IN ('proposed', 'approved')",
+                (now(),),
+            )
         if flatten:
             for pos in self.db.open_positions():
                 self.close(pos["id"], "kill switch")
                 out.append(f"position {pos['id']} closed")
         self.log("desk", "kill", "Kill switch", "\n".join(out))
         return out
+
+    def rebalance(self, propose: bool = False) -> dict:
+        """Core targets against holdings. With propose, buys become plans and trims wait."""
+        if propose:
+            return portfolio.propose(self)
+        return {"rows": portfolio.current(self, self.broker.equity()), "plans": [], "trims": []}

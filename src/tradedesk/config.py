@@ -4,7 +4,9 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from tradedesk import profiles
 
 ROOT = Path(os.environ.get("DESK_HOME", Path.cwd()))
 
@@ -46,6 +48,13 @@ class RiskLimits(BaseModel):
     floor_pct: float = Field(0.0, ge=0, le=100)
     # Futures: maintenance margin used to estimate the liquidation price (isolated margin).
     maintenance_margin_pct: float = Field(0.5, ge=0, le=10)
+    # conservative, balanced or aggressive: fills every limit this table doesn't set.
+    profile: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def apply_profile(cls, data):
+        return profiles.resolve(data) if isinstance(data, dict) else data
 
 
 class HoldLimits(BaseModel):
@@ -61,6 +70,30 @@ class Execution(BaseModel):
     auto_execute: bool = False
     close_expired: bool = True
     entry_ttl_hours: int = 24
+
+
+class Portfolio(BaseModel):
+    core_pct: float = Field(0.0, ge=0, lt=100)
+    core_targets: dict[str, float] = {}
+    rebalance_band_pct: float = Field(5.0, gt=0)
+    core_stop_pct: float = Field(35.0, gt=0, lt=100)
+    base_currency: str = "CHF"
+
+    @field_validator("core_targets")
+    @classmethod
+    def weights(cls, v: dict[str, float]) -> dict[str, float]:
+        v = {k.strip().upper(): float(w) for k, w in v.items()}
+        if any(w <= 0 for w in v.values()):
+            raise ValueError("core target weights must be above 0")
+        if v and abs(sum(v.values()) - 100) > 0.01:
+            raise ValueError(f"core target weights add up to {sum(v.values()):g}, not 100")
+        return v
+
+    @model_validator(mode="after")
+    def targets_when_on(self) -> "Portfolio":
+        if self.core_pct > 0 and not self.core_targets:
+            raise ValueError("core_pct is set but core_targets is empty")
+        return self
 
 
 class Settings(BaseModel):
@@ -82,6 +115,7 @@ class Settings(BaseModel):
     futures_url: str = ""
     db_path: Path = Path("data/desk.db")
     runs_dir: Path = Path("runs")
+    portfolio: Portfolio = Portfolio()
 
     def symbol(self, asset: str) -> str:
         return f"{asset.upper()}{self.quote}"

@@ -63,6 +63,14 @@ Every idea counts, taken, passed or rejected. `desk learn` replays each one on r
 
 `desk stats` (and `GET /api/learning`) turns that into calibration: hit rate and average R by confidence, asset, horizon, side and decision, the market after days with no ideas, and whether the bull or the bear side matched. Every number carries its sample size, and groups under 10 examples say "not enough data yet". Lessons may change how ideas are judged, never the risk limits. Once 10 ideas have resolved, `book.md` carries a one-line calibration summary.
 
+## Risk profiles, core sleeve and performance
+
+`[risk] profile` picks a set of limits: `conservative` risks 0.5% per trade with a 10% drawdown pause, `balanced` is the default set above, `aggressive` risks 2% with a 25% pause. Any limit you write in `[risk]` yourself overrides the profile, and the dashboard only writes back the keys that differ from it.
+
+`[portfolio]` splits the account in two. `core_pct = 30` with `core_targets = { BTC = 60, PAXG = 40 }` keeps 30% of equity as a long-term core and lets the desk trade the other 70%. Trade size, open risk and the position cap use the active part only; the daily loss limit and the drawdown pause still use the whole account. `desk rebalance` shows each core asset's target, value and drift, and `desk rebalance --propose` turns any asset more than `rebalance_band_pct` under its target into a market buy plan with sleeve `core`, a stop 35% under entry and a target at 1.9x. These skip the confidence, reward/risk and ATR rules, but not exchange minimums, free cash or the drawdown pause, and they wait for approval like any plan. An asset over its band gets trims: whole core lots, newest first, that bring it down without going under target. Trims sit in the `trims` table until you run `desk trim ID` (or approve them in the dashboard) and then `desk execute`. Core positions never expire. The core needs `market = "spot"`.
+
+`desk analytics` (and `GET /api/analytics`) prints total return, max and current drawdown, Sharpe and Sortino (after 14 days), best and worst day, win rate, profit factor, expectancy in R and in quote, and the same per asset, horizon, side, sleeve and exit reason, next to BTC bought and held over the same days. `GET /api/portfolio` has equity in quote and in `base_currency`, both sleeves, allocation by asset and asset class, core drift and the waiting rebalance. The CHF value uses FRED's DEXSZUS rate with USDT counted as USD; when FRED doesn't answer the output says so.
+
 ## Commands
 
 | Command | What it does |
@@ -79,6 +87,9 @@ Every idea counts, taken, passed or rejected. `desk learn` replays each one on r
 | `desk journal` | Closed trades with R multiples |
 | `desk learn` | Replay every idea on real candles into `outcomes` |
 | `desk stats` | Calibration report for `/review` |
+| `desk rebalance [--propose]` | Core targets against holdings, and plans to close the gaps |
+| `desk trim ID [--reject]` | Approve or drop a core trim |
+| `desk analytics` | Returns, drawdown, ratios and trade stats |
 
 ## Configuration
 

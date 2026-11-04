@@ -106,10 +106,29 @@ CREATE TABLE IF NOT EXISTS outcomes (
     change_7d REAL,
     above_ema200_1d INTEGER
 );
+CREATE TABLE IF NOT EXISTS trims (
+    id INTEGER PRIMARY KEY,
+    run_id TEXT,
+    position_id INTEGER NOT NULL REFERENCES positions(id),
+    asset TEXT NOT NULL,
+    qty REAL NOT NULL,
+    price REAL NOT NULL,
+    value REAL NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS events_run ON events(run_id, id);
 CREATE INDEX IF NOT EXISTS plans_status ON plans(status);
 CREATE INDEX IF NOT EXISTS positions_status ON positions(status);
 """
+
+# (table, column, definition) added to databases created before the column existed
+COLUMNS = [
+    ("plans", "sleeve", "TEXT NOT NULL DEFAULT 'active'"),
+    ("positions", "sleeve", "TEXT NOT NULL DEFAULT 'active'"),
+]
 
 
 def now() -> str:
@@ -123,6 +142,14 @@ class Database:
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.executescript(SCHEMA)
+        self.migrate()
+
+    def migrate(self) -> None:
+        for table, column, definition in COLUMNS:
+            have = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+            if column not in have:
+                with self.tx() as c:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:

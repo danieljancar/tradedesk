@@ -138,7 +138,8 @@ def learn(
     cutoff = iso(now_ms - stale_ms)
     plans = db.all(
         "SELECT p.* FROM plans p LEFT JOIN outcomes o ON o.plan_id = p.id "
-        f"WHERE o.plan_id IS NULL OR (o.outcome NOT IN {RESOLVED} AND o.updated_at < ?) "
+        "WHERE p.sleeve = 'active' AND "
+        f"(o.plan_id IS NULL OR (o.outcome NOT IN {RESOLVED} AND o.updated_at < ?)) "
         "ORDER BY p.id",
         cutoff,
     )

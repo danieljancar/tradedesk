@@ -14,6 +14,7 @@ watchlist = ["BTC", "ETH", "SOL"]
 paper_equity = 1000.0
 
 [risk]
+# profile = "balanced"         # conservative, balanced or aggressive; keys set below still win
 risk_per_trade_pct = 1.0       # loss at the stop, as % of equity
 max_open_positions = 4         # positions plus resting entries
 max_total_risk_pct = 4.0       # all open stops together
@@ -36,3 +37,10 @@ long = 120
 auto_execute = false   # true sends every plan that passes the risk check without asking
 close_expired = true   # close positions held longer than their horizon allows
 entry_ttl_hours = 24   # cancel limit entries that haven't filled by then
+
+[portfolio]
+core_pct = 0.0                 # share of equity held long term in the core sleeve, 0 is off
+core_targets = {}              # core weights in %, adding up to 100, e.g. { BTC = 60, PAXG = 40 }
+rebalance_band_pct = 5.0       # rebalance an asset when it drifts this far from its own target
+core_stop_pct = 35.0           # wide exchange stop under every core buy
+base_currency = "CHF"          # equity is also shown in this currency (FRED rate, USDT as USD)

@@ -17,6 +17,12 @@ class Book:
     open_risk: float
     open_count: int
     taken: set[tuple[str, str]] = field(default_factory=set)
+    # equity of the active trading sleeve when part of the account is a long-term core
+    sleeve_equity: float | None = None
+
+    @property
+    def active_equity(self) -> float:
+        return self.equity if self.sleeve_equity is None else self.sleeve_equity
 
 
 @dataclass
@@ -122,17 +128,17 @@ def check(
                 f"protected floor ({limits.floor_pct}% of {limits.principal})"
             )
         risk_amount = max(0.0, min(risk_amount, room))
-    if (book.open_risk + risk_amount) / book.equity * 100 > limits.max_total_risk_pct:
+    if (book.open_risk + risk_amount) / book.active_equity * 100 > limits.max_total_risk_pct:
         reasons.append(
             f"open risk {book.open_risk:.2f} plus this trade exceeds {limits.max_total_risk_pct}%"
         )
 
     qty = risk_amount / stop_dist if risk_amount > 0 else 0.0
-    cap = book.equity * limits.max_position_pct / 100
+    cap = book.active_equity * limits.max_position_pct / 100
     leverage = 1
     if settings.market is Market.FUTURES:
         # isolated margin: each position gets its own slice of the account as collateral
-        slot = book.equity / limits.max_open_positions
+        slot = book.active_equity / limits.max_open_positions
         cap = min(cap * limits.max_leverage, slot * limits.max_leverage)
         qty = min(qty, cap / entry)
         leverage = max(1, min(limits.max_leverage, math.ceil(qty * entry / slot)))
@@ -166,11 +172,11 @@ def check(
 
 def position_risk(settings: Settings, book: Book) -> float:
     """Loss at the stop. With a principal set, profits above it are risked at their own rate."""
-    limits = settings.risk
+    limits, equity = settings.risk, book.active_equity
     if not limits.principal:
-        return book.equity * limits.risk_per_trade_pct / 100
-    on_principal = min(book.equity, limits.principal) * limits.risk_per_trade_pct / 100
-    profit = max(0.0, book.equity - limits.principal)
+        return equity * limits.risk_per_trade_pct / 100
+    on_principal = min(equity, limits.principal) * limits.risk_per_trade_pct / 100
+    profit = max(0.0, equity - limits.principal)
     return on_principal + profit * limits.profit_risk_pct / 100
 
 

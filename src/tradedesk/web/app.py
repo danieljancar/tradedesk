@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
 
-from tradedesk import learning, macro, notes, settings_io, wire
+from tradedesk import analytics, learning, macro, notes, portfolio, settings_io, wire
 from tradedesk.binance import market_data
 from tradedesk.config import ROOT
 from tradedesk.desk import Desk
@@ -241,7 +241,7 @@ def create_app(desk: Desk) -> FastAPI:
             new = settings_io.update(body)
         except ValueError as e:
             raise HTTPException(422, str(e)) from e
-        for field in ("watchlist", "paper_equity", "risk", "execution", "hold_days"):
+        for field in ("watchlist", "paper_equity", "risk", "execution", "hold_days", "portfolio"):
             setattr(desk.settings, field, getattr(new, field))
         return settings_io.read()
 
@@ -264,6 +264,35 @@ def create_app(desk: Desk) -> FastAPI:
     def sync(x_desk: str | None = Header(None)) -> dict:
         guard(x_desk)
         return {"result": desk.sync()}
+
+    @app.get("/api/analytics")
+    def analytics_report() -> dict:
+        """Returns, drawdown, ratios, trade stats and BTC buy and hold over the same window."""
+        settings = desk.settings
+        return analytics.report(db, settings, market_data(settings).klines)
+
+    @app.get("/api/portfolio")
+    def portfolio_state() -> dict:
+        s = desk.settings
+        try:
+            return portfolio.state(desk, analytics.fx_rate(s.quote, s.portfolio.base_currency))
+        except Exception as e:
+            raise HTTPException(502, f"prices did not load: {e}") from e
+
+    @app.post("/api/trims/{trim_id}/approve")
+    def approve_trim(trim_id: int, x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        try:
+            portfolio.approve_trim(desk, trim_id)
+        except ValueError as e:
+            raise HTTPException(409, str(e)) from e
+        return {"result": desk.execute()}
+
+    @app.post("/api/trims/{trim_id}/reject")
+    def reject_trim(trim_id: int, x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        portfolio.reject_trim(desk, trim_id)
+        return {"result": "dropped"}
 
     @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
     def spa(path: str) -> str:

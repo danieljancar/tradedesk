@@ -258,3 +258,45 @@ def demo(port: int = 8421, pause: float = 1.6) -> None:
     replay.start(d, pause)
     say(f"demo on http://127.0.0.1:{port}")
     uvicorn.run(create_app(d), host="127.0.0.1", port=port, log_level="warning")
+
+
+@app.command()
+def rebalance(propose: bool = False) -> None:
+    """Core sleeve targets against holdings. --propose turns the gaps into plans and trims."""
+    from tradedesk import portfolio
+
+    d = desk()
+    if d.settings.portfolio.core_pct <= 0:
+        say("core sleeve is off, set [portfolio] core_pct and core_targets in desk.toml")
+        return
+    r = d.rebalance(propose)
+    say([portfolio.row_line(row) for row in r["rows"]])
+    for p in r["plans"]:
+        say(f"plan {p['id']} buy {p['asset']}: {p['status']} {'; '.join(p['reasons'])}".rstrip())
+    for t in r["trims"]:
+        say(f"trim {t['id']} sells position {t['position']} ({t['asset']}, {t['value']:.2f})")
+    if propose and (r["plans"] or r["trims"]):
+        say("approve with `desk approve ID` and `desk trim ID`, then `desk execute`")
+
+
+@app.command()
+def trim(trim_id: int, reject: bool = False) -> None:
+    """Approve a proposed core trim, or drop it with --reject."""
+    from tradedesk import portfolio
+
+    if reject:
+        portfolio.reject_trim(desk(), trim_id)
+        say(f"trim {trim_id} dropped")
+        return
+    portfolio.approve_trim(desk(), trim_id)
+    say(f"trim {trim_id} approved, `desk execute` sends it")
+
+
+@app.command()
+def analytics() -> None:
+    """Return, drawdown, Sharpe, trade stats and BTC buy and hold over the same days."""
+    from tradedesk import analytics as perf
+    from tradedesk.binance import market_data
+
+    d = desk()
+    say(perf.summary(perf.report(d.db, d.settings, market_data(d.settings).klines)))

@@ -44,8 +44,11 @@ class SpotBroker:
     def equity(self) -> float:
         bal = self._balances()
         total = bal.get(self.settings.quote, 0.0)
-        for asset in self.settings.watchlist:
-            amount = bal.get(asset.upper(), 0.0)
+        held = {
+            a.upper() for a in [*self.settings.watchlist, *self.settings.portfolio.core_targets]
+        }
+        for asset in held:
+            amount = bal.get(asset, 0.0)
             if amount:
                 total += amount * self.price(self.settings.symbol(asset))
         return total

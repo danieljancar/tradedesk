@@ -5,10 +5,11 @@ import os
 import tomllib
 from pathlib import Path
 
+from tradedesk import profiles
 from tradedesk.config import ROOT, Settings
 
 READ_ONLY = {"mode", "market", "quote", "db_path", "runs_dir"}
-EDITABLE_TABLES = {"risk", "execution", "hold_days"}
+EDITABLE_TABLES = {"risk", "execution", "hold_days", "portfolio"}
 
 
 def config_path() -> Path:
@@ -19,7 +20,12 @@ def read() -> dict:
     path = config_path()
     data = tomllib.loads(path.read_text()) if path.exists() else {}
     full = Settings.model_validate(data).model_dump(mode="json")
-    return {"path": str(path), "settings": full, "read_only": sorted(READ_ONLY)}
+    return {
+        "path": str(path),
+        "settings": full,
+        "read_only": sorted(READ_ONLY),
+        "profiles": profiles.PROFILES,
+    }
 
 
 def _value(v) -> str:
@@ -27,6 +33,8 @@ def _value(v) -> str:
         return "true" if v else "false"
     if isinstance(v, (int, float)):
         return repr(v)
+    if isinstance(v, dict):
+        return "{ " + ", ".join(f"{k} = {_value(x)}" for k, x in v.items()) + " }"
     if isinstance(v, list):
         return "[" + ", ".join(_value(x) for x in v) + "]"
     return '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'
@@ -52,11 +60,19 @@ def update(changes: dict) -> Settings:
     path = config_path()
     current = tomllib.loads(path.read_text()) if path.exists() else {}
     merged = dict(current)
+    effective = Settings.model_validate(current).model_dump()
     for key, value in changes.items():
         if key in READ_ONLY:
             raise ValueError(f"{key} can only be changed in {path.name} by hand")
         if key in EDITABLE_TABLES and isinstance(value, dict):
-            merged[key] = {**current.get(key, {}), **value}
+            table = current.get(key, {})
+            # a value the client only echoed back, unchanged and never set in the file, stays unset
+            value = {
+                k: v
+                for k, v in value.items()
+                if k in table or k == "profile" or v != effective[key].get(k)
+            }
+            merged[key] = {**table, **value}
         elif key in ("watchlist", "paper_equity"):
             merged[key] = value
         else:
@@ -65,6 +81,8 @@ def update(changes: dict) -> Settings:
         merged["watchlist"] = [
             str(a).upper().strip() for a in merged["watchlist"] if str(a).strip()
         ]
+    if "risk" in merged:
+        merged["risk"] = profiles.explicit(merged["risk"])
     new = Settings.model_validate(merged)
     path.write_text(to_toml(merged))
     return new
