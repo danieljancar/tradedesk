@@ -6,7 +6,7 @@ from tradedesk.binance.client import BinanceError, Client
 from tradedesk.binance.market import MarketData, SymbolRules
 from tradedesk.broker.base import Exit, Fill, Placed, Unprotected
 from tradedesk.config import Settings
-from tradedesk.db import now
+from tradedesk.db import Database, now
 from tradedesk.risk import SPOT_FEE_BUFFER as FEE_BUFFER
 
 DEAD = ("CANCELED", "EXPIRED", "REJECTED", "EXPIRED_IN_MATCH")
@@ -24,10 +24,13 @@ def client_id(plan: dict) -> str:
 class SpotBroker:
     """Long-only spot. Every entry carries an exchange-side stop and target (OTOCO or OCO)."""
 
-    def __init__(self, settings: Settings, client: Client, md: MarketData):
+    def __init__(
+        self, settings: Settings, client: Client, md: MarketData, db: Database | None = None
+    ):
         self.settings = settings
         self.client = client
         self.md = md
+        self.db = db
 
     def price(self, symbol: str) -> float:
         return self.md.price(symbol)
@@ -44,7 +47,8 @@ class SpotBroker:
     def equity(self) -> float:
         bal = self._balances()
         total = bal.get(self.settings.quote, 0.0)
-        for asset in self.settings.watchlist:
+        held = {p["asset"] for p in self.db.open_positions()} if self.db else set()
+        for asset in {a.upper() for a in self.settings.watchlist} | held:
             amount = bal.get(asset.upper(), 0.0)
             if amount:
                 total += amount * self.price(self.settings.symbol(asset))

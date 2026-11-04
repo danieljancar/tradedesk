@@ -17,6 +17,7 @@ class Book:
     open_risk: float
     open_count: int
     taken: set[tuple[str, str]] = field(default_factory=set)
+    allowed: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -62,7 +63,9 @@ def check(
     reasons = account_blocks(settings, book)
     s = idea.side.sign
 
-    if idea.asset not in [a.upper() for a in settings.watchlist]:
+    if book.allowed and idea.asset not in book.allowed:
+        reasons.append(f"{idea.asset} is not in today's universe")
+    elif not book.allowed and idea.asset not in [a.upper() for a in settings.watchlist]:
         reasons.append(f"{idea.asset} is not on the watchlist")
     if idea.rating in (Rating.HOLD,):
         reasons.append("rating is hold, nothing to place")

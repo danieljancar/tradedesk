@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
 
-from tradedesk import learning, macro, notes, settings_io, wire
+from tradedesk import learning, macro, notes, settings_io, universe, wire
 from tradedesk.binance import market_data
 from tradedesk.config import ROOT
 from tradedesk.desk import Desk
@@ -44,7 +44,8 @@ def create_app(desk: Desk) -> FastAPI:
     @app.get("/api/candles/{asset}")
     def candles(asset: str, tf: str = "1d", limit: int = 200) -> list[dict]:
         asset = asset.upper()
-        if asset not in {*desk.settings.watchlist, "BTC", "ETH"} or tf not in TIMEFRAMES:
+        known = {*desk.settings.watchlist, "BTC", "ETH", *(a["asset"] for a in desk.run_assets())}
+        if asset not in known or tf not in TIMEFRAMES:
             raise HTTPException(404, "unknown asset or timeframe")
         key = (asset, tf, limit)
         hit = cache.get(key)
@@ -264,6 +265,15 @@ def create_app(desk: Desk) -> FastAPI:
     def sync(x_desk: str | None = Header(None)) -> dict:
         guard(x_desk)
         return {"result": desk.sync()}
+
+    @app.get("/api/universe")
+    def universe_list(run_id: str | None = None) -> list[dict]:
+        run_id = run_id or desk.run_id()
+        if not run_id:
+            return []
+        if run_id not in {r["id"] for r in db.all("SELECT id FROM runs")}:
+            raise HTTPException(404, "unknown run")
+        return universe.read(desk.run_dir(run_id)) or []
 
     @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
     def spa(path: str) -> str:

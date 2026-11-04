@@ -72,7 +72,7 @@ def run_recover() -> None:
 
 @app.command()
 def snapshot() -> None:
-    """Prices, indicators, levels and derivatives for the watchlist."""
+    """Prices, indicators, levels and derivatives for today's assets."""
     say(str(desk().write_snapshot()))
 
 
@@ -258,3 +258,9 @@ def demo(port: int = 8421, pause: float = 1.6) -> None:
     replay.start(d, pause)
     say(f"demo on http://127.0.0.1:{port}")
     uvicorn.run(create_app(d), host="127.0.0.1", port=port, log_level="warning")
+
+
+@app.command()
+def scan() -> None:
+    """Scan the spot market for movers and write today's universe."""
+    say(str(desk().write_universe()))

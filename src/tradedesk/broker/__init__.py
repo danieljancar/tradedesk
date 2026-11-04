@@ -14,7 +14,7 @@ def make_broker(settings: Settings, db: Database) -> Broker:
     client = trading_client(settings)
     if settings.market is Market.FUTURES:
         return FuturesBroker(settings, client, md)
-    return SpotBroker(settings, client, md)
+    return SpotBroker(settings, client, md, db)
 
 
 __all__ = ["Broker", "Exit", "Fill", "Placed", "make_broker"]

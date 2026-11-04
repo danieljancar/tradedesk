@@ -63,6 +63,16 @@ class Execution(BaseModel):
     entry_ttl_hours: int = 24
 
 
+class Universe(BaseModel):
+    enabled: bool = True
+    min_quote_volume: float = Field(20_000_000, ge=0)
+    top: int = Field(6, ge=0)
+    max_assets: int = Field(12, ge=1)
+    always: list[str] = []
+    exclude: list[str] = []
+    include_gold: bool = True
+
+
 class Settings(BaseModel):
     mode: Mode = Mode.PAPER
     market: Market = Market.SPOT
@@ -82,6 +92,7 @@ class Settings(BaseModel):
     futures_url: str = ""
     db_path: Path = Path("data/desk.db")
     runs_dir: Path = Path("runs")
+    universe: Universe = Universe()
 
     def symbol(self, asset: str) -> str:
         return f"{asset.upper()}{self.quote}"

@@ -8,11 +8,11 @@ A small crypto desk that runs on your own machine. Claude Code agents read the m
 
 `/daily` in Claude Code runs one pass:
 
-1. `desk snapshot` pulls 4h, daily and weekly candles from Binance and turns them into a short text file per asset: EMAs, RSI, MACD, ATR, swing levels, funding, open interest and the long/short ratio, plus the fear and greed index. `desk news` collects the last 36 hours of headlines from CoinDesk, Cointelegraph, Decrypt and The Block and sorts them by asset. `desk book` writes down equity, open positions, recent results and the lessons from past reviews.
-2. Two analysts run in parallel. The technical analyst reads only the snapshot. The news analyst reads the headlines and checks the macro calendar with at most three web searches.
+1. `desk scan` looks at every Binance spot pair in the quote currency and picks the strongest movers by 7 day move against BTC, volume against its weekly average and ATR. Those join the watchlist and gold (PAXG) as today's assets. `desk snapshot` pulls 4h, daily and weekly candles from Binance and turns them into a short text file per asset: EMAs, RSI, MACD, ATR, swing levels, funding, open interest and the long/short ratio, plus the fear and greed index. `desk news` collects the last 36 hours of headlines from CoinDesk, Cointelegraph, Decrypt and The Block and sorts them by asset. `desk book` writes down equity, open positions, recent results and the lessons from past reviews.
+2. Two analysts run in parallel. The technical analyst reads only the snapshot and the list of today's assets. The news analyst reads the headlines and checks the macro calendar with at most three web searches.
 3. A bull and a bear each read both reports and make their case, one round, 200 words each.
 4. The main session acts as portfolio manager. It weighs both sides and writes `plans.json` with entry, stop, target, horizon and confidence per idea. It never sets size.
-5. `desk check` runs every idea through the risk engine. It sizes the trade so a stop-out costs 1% of equity and rejects anything that breaks a rule: reward to risk under 2, a stop tighter than half an ATR, too much open risk, a daily loss over 3%, drawdown over 15%, an asset off the watchlist, a short on spot.
+5. `desk check` runs every idea through the risk engine. It sizes the trade so a stop-out costs 1% of equity and rejects anything that breaks a rule: reward to risk under 2, a stop tighter than half an ATR, too much open risk, a daily loss over 3%, drawdown over 15%, an asset outside today's list, a short on spot.
 6. Plans that pass wait for you in the dashboard. Approving one sends it to Binance.
 
 Each agent has a word limit and reads files from the run folder instead of passing long reports through the conversation.
@@ -67,6 +67,7 @@ Every idea counts, taken, passed or rejected. `desk learn` replays each one on r
 
 | Command | What it does |
 | --- | --- |
+| `desk scan` | Pick today's assets from the whole spot market |
 | `desk snapshot`, `news`, `book` | Write the day's input files |
 | `desk check plans.json` | Validate and size ideas |
 | `desk plans`, `approve ID`, `reject ID` | Review proposed plans |
@@ -83,6 +84,8 @@ Every idea counts, taken, passed or rejected. `desk learn` replays each one on r
 ## Configuration
 
 `desk.example.toml` lists every setting with its default: mode (`paper`, `testnet`, `live`), market (`spot`, `futures`), watchlist, risk limits, hold times and whether passing plans go out without approval.
+
+The `[universe]` section controls the scan. Pairs under 20M USDT of 24h volume are skipped, stablecoins, fiat and leveraged tokens never show up, and `exclude` drops any asset you don't want. The scan adds its top 6 movers after the watchlist, the `always` list and PAXG, up to 12 assets a day. Scan picks go through the same risk rules as everything else. With `enabled = false` the desk uses only the watchlist, like before.
 
 ## Development
 
