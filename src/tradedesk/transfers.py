@@ -62,8 +62,12 @@ def balance(spot: "Desk", futures: "Desk") -> list[str]:
         )
     elif spot.settings.mode is Mode.TESTNET:
         return [f"would move {abs(amount):.2f} {quote}, the testnet has no wallet transfers"]
-    spot.db.record_flow(-amount, "transfer", "to futures" if amount > 0 else "from futures")
-    futures.db.record_flow(amount, "transfer", "from spot" if amount > 0 else "to spot")
+    # the flow and the first equity after it share a second that no earlier sample can have
+    at = (datetime.now(UTC) + timedelta(seconds=1)).isoformat(timespec="seconds")
+    spot.db.record_flow(-amount, "transfer", "to futures" if amount > 0 else "from futures", at)
+    futures.db.record_flow(amount, "transfer", "from spot" if amount > 0 else "to spot", at)
+    for desk in (spot, futures):
+        desk.db.record_equity(desk.broker.equity(), at)
     direction = "spot to futures" if amount > 0 else "futures to spot"
     spot.log(
         "exchange",

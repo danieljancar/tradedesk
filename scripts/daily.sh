@@ -4,7 +4,8 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.."
 mkdir -p data/logs
-log="data/logs/$(date +%Y-%m-%d).log"
+cfg="$(basename "${DESK_CONFIG:-desk.toml}" .toml)"
+log="data/logs/$(date +%Y-%m-%d)-$cfg.log"
 echo "=== $(date '+%F %T') daily run" >>"$log"
 
 # A quiet hour needs no agents: the sync still handles fills, stops and trailing.

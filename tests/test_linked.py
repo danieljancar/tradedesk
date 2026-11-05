@@ -160,3 +160,11 @@ def test_local_errors_keep_a_futures_entry_waiting(pair, tmp_path, monkeypatch):
     monkeypatch.setattr(fut, "_sync_entry", refused)
     fut.sync()
     assert fut.db.one("SELECT status FROM plans")["status"] == "rejected"
+
+
+def test_samples_before_a_transfer_are_not_a_drawdown(pair):
+    pair.db.record_equity(1000, "2026-11-05T22:00:00+00:00")
+    pair.db.record_flow(-350, "transfer", ts="2026-11-05T22:00:01+00:00")
+    pair.db.record_equity(650, "2026-11-05T22:00:01+00:00")
+    pair.db.record_equity(640, "2026-11-05T22:10:00+00:00")
+    assert pair.db.peak_equity() == pytest.approx(650)

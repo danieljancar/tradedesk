@@ -240,9 +240,11 @@ class Database:
             "SELECT * FROM plans WHERE status IN ('approved', 'placed') ORDER BY created_at"
         )
 
-    def record_equity(self, value: float) -> None:
+    def record_equity(self, value: float, ts: str | None = None) -> None:
         with self.tx() as c:
-            c.execute("INSERT OR REPLACE INTO equity (ts, value) VALUES (?, ?)", (now(), value))
+            c.execute(
+                "INSERT OR REPLACE INTO equity (ts, value) VALUES (?, ?)", (ts or now(), value)
+            )
 
     def peak_equity(self) -> float | None:
         """Highest equity, with money moved in or out since then counted as if it was there."""
@@ -258,11 +260,11 @@ class Database:
         row = self.one("SELECT COALESCE(SUM(amount), 0) AS v FROM flows")
         return row["v"] if row else 0.0
 
-    def record_flow(self, amount: float, kind: str, note: str = "") -> None:
+    def record_flow(self, amount: float, kind: str, note: str = "", ts: str | None = None) -> None:
         with self.tx() as c:
             c.execute(
                 "INSERT INTO flows (ts, amount, kind, note) VALUES (?, ?, ?, ?)",
-                (now(), amount, kind, note),
+                (ts or now(), amount, kind, note),
             )
 
     def realized_since(self, iso_ts: str) -> float:
