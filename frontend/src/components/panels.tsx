@@ -70,8 +70,8 @@ function Ladder({ p }: { p: Plan }) {
 }
 
 export function Plans({ state, refresh }: { state: DeskState | null; refresh: () => void }) {
-  const [busy, setBusy] = useState<number | null>(null);
-  const act = async (path: string, id: number, ok: string) => {
+  const [busy, setBusy] = useState<string | null>(null);
+  const act = async (path: string, id: string, ok: string) => {
     setBusy(id);
     try { await api(path, "POST"); toast.success(ok); } catch (e: any) { toast.error(e.message); }
     setBusy(null);
@@ -98,7 +98,7 @@ export function Plans({ state, refresh }: { state: DeskState | null; refresh: ()
             <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className={cn("uppercase", p.side === "long" ? "bg-up text-white" : "bg-down text-white")}>{p.side}</Badge>
-                <CardTitle className="font-heading text-2xl">{p.asset}</CardTitle>
+                <CardTitle className="font-heading text-2xl">{p.asset}{p.venue === "futures" && <span className="ml-1.5 rounded bg-warn/12 px-1 py-px text-xs align-middle font-medium text-warn">futures{p.leverage > 1 ? ` ${p.leverage}x` : ""}</span>}</CardTitle>
                 <Badge variant="outline">{p.horizon} term</Badge>
                 <Badge variant="outline"><Term k="confidence" /> {p.confidence}</Badge>
                 {p.reward_risk && <Badge variant="outline"><Term k="rr">R/R</Term> {p.reward_risk}</Badge>}
@@ -167,7 +167,7 @@ export function Account({ state, refresh }: { state: DeskState | null; refresh: 
   const eq = vals.at(-1)?.value;
   const diff = eq != null && vals[0] ? eq - vals[0].value : 0;
   const data = vals.map((v) => ({ t: new Date(v.ts).toLocaleDateString([], { month: "short", day: "numeric" }), v: v.value }));
-  const closePos = async (id: number, asset: string) => {
+  const closePos = async (id: string, asset: string) => {
     if (!confirm(`Close ${asset} at market now?`)) return;
     try { await api(`/api/positions/${id}/close`, "POST"); toast.success("Closed"); } catch (e: any) { toast.error(e.message); }
     refresh();

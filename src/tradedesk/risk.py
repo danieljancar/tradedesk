@@ -20,6 +20,8 @@ class Book:
     allowed: set[str] = field(default_factory=set)
     # equity of the active trading sleeve when part of the account is a long-term core
     sleeve_equity: float | None = None
+    # configured principal plus money moved in or out since, None when no principal is set
+    principal: float | None = None
 
     @property
     def active_equity(self) -> float:
@@ -123,12 +125,13 @@ def check(
         reasons.append(f"reward/risk {rr:.2f} below {limits.min_reward_risk}")
 
     risk_amount = position_risk(settings, book, idea.confidence)
-    if limits.principal and limits.floor_pct:
-        room = book.equity - limits.principal * limits.floor_pct / 100 - book.open_risk
+    principal = book.principal if book.principal is not None else limits.principal
+    if principal and limits.floor_pct:
+        room = book.equity - principal * limits.floor_pct / 100 - book.open_risk
         if room <= 0:
             reasons.append(
                 f"equity {book.equity:.2f} with open risk {book.open_risk:.2f} is at the "
-                f"protected floor ({limits.floor_pct}% of {limits.principal})"
+                f"protected floor ({limits.floor_pct}% of {principal:.2f})"
             )
         risk_amount = max(0.0, min(risk_amount, room))
     if (book.open_risk + risk_amount) / book.active_equity * 100 > limits.max_total_risk_pct:
@@ -189,10 +192,11 @@ def position_risk(settings: Settings, book: Book, confidence: int | None = None)
     """Loss at the stop. With a principal set, profits above it are risked at their own rate."""
     limits, equity = settings.risk, book.active_equity
     scale = conviction(settings, confidence)
-    if not limits.principal:
+    principal = book.principal if book.principal is not None else limits.principal
+    if not principal:
         return equity * limits.risk_per_trade_pct / 100 * scale
-    on_principal = min(equity, limits.principal) * limits.risk_per_trade_pct / 100
-    profit = max(0.0, equity - limits.principal)
+    on_principal = min(equity, principal) * limits.risk_per_trade_pct / 100
+    profit = max(0.0, equity - principal)
     return (on_principal + profit * limits.profit_risk_pct / 100) * scale
 
 

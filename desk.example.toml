@@ -7,6 +7,8 @@ mode = "paper"
 
 # spot is long only. futures allows shorts and leverage.
 market = "spot"
+# Trade a futures wallet from the same runs as well. That file holds its own db_path and [risk].
+# futures_desk = "data/futures.toml"
 quote = "USDT"
 watchlist = ["BTC", "ETH", "SOL"]
 
@@ -66,3 +68,11 @@ core_targets = {}              # core weights in %, adding up to 100, e.g. { BTC
 rebalance_band_pct = 5.0       # rebalance an asset when it drifts this far from its own target
 core_stop_pct = 35.0           # wide exchange stop under every core buy
 base_currency = "CHF"          # equity is also shown in this currency (FRED rate, USDT as USD)
+
+
+[transfers]
+enabled = false        # move free USDT between spot and futures to keep the split below
+futures_pct = 35       # share of the two wallets together that sits on futures
+band_pct = 10          # only move once the futures share is this far off
+min_amount = 5
+keep_free_pct = 10     # always leave this share of a wallet's equity free

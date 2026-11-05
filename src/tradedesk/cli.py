@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from tradedesk import notify
-from tradedesk.config import settings
+from tradedesk.config import linked_settings, settings
 from tradedesk.db import Database
 from tradedesk.desk import Desk
 
@@ -19,8 +19,17 @@ app.add_typer(run_app, name="run", help="Start and finish a daily run.")
 def desk() -> Desk:
     s = settings()
     d = Desk(s, Database(s.path(s.db_path)))
+    if (fs := linked_settings(s)) is not None:
+        d.link(Desk(fs, Database(fs.path(fs.db_path))))
     notify.attach(d)
     return d
+
+
+def pick(futures: bool) -> Desk:
+    d = desk()
+    if futures and d.linked is None:
+        raise typer.BadParameter("no futures_desk is set in the config")
+    return d.linked if futures else d
 
 
 def say(lines: list[str] | str) -> None:
@@ -107,6 +116,8 @@ def check(file: Path) -> None:
     """Validate a plans.json and size every idea with the risk rules."""
     for r in desk().check_plans(file):
         label = f"plan {r['id']} {r['asset']}" if "id" in r else f"position {r['position']}"
+        if desk().linked is not None:
+            label = f"{r['venue']} {label}"
         detail = "; ".join(r["reasons"]) or (
             f"qty {r['qty']:g} risk {r['risk']:.2f} R/R {r['rr']}" if "qty" in r else ""
         )
@@ -116,10 +127,17 @@ def check(file: Path) -> None:
 @app.command()
 def plans(status: str = "proposed") -> None:
     """List plans by status."""
-    rows = desk().db.all("SELECT * FROM plans WHERE status = ? ORDER BY id", status)
+    main = desk()
+    rows = [
+        {**p, "venue": d.settings.market.value}
+        for d in (main, main.linked)
+        if d is not None
+        for p in d.db.all("SELECT * FROM plans WHERE status = ? ORDER BY id", status)
+    ]
     say(
         [
-            f"{p['id']} {p['asset']} {p['side']} {p['horizon']} entry {p['entry']:g} stop "
+            f"{p['venue'] + ' ' if main.linked else ''}{p['id']} {p['asset']} {p['side']} "
+            f"{p['horizon']} entry {p['entry']:g} stop "
             f"{p['stop']:g} target {p['take_profit']:g} qty {p['qty']:g} R/R {p['reward_risk']}"
             for p in rows
         ]
@@ -128,14 +146,14 @@ def plans(status: str = "proposed") -> None:
 
 
 @app.command()
-def approve(plan_id: int) -> None:
-    desk().approve(plan_id)
+def approve(plan_id: int, futures: bool = False) -> None:
+    pick(futures).approve(plan_id)
     say(f"plan {plan_id} approved")
 
 
 @app.command()
-def reject(plan_id: int) -> None:
-    desk().reject(plan_id)
+def reject(plan_id: int, futures: bool = False) -> None:
+    pick(futures).reject(plan_id)
     say(f"plan {plan_id} dropped")
 
 
@@ -182,31 +200,34 @@ def watch(every: int = 300) -> None:
 
 @app.command()
 def status() -> None:
-    d = desk()
-    b = d.book()
-    say(
-        f"{d.settings.mode} {d.settings.market} | equity {b.equity:.2f} | open risk "
-        f"{b.open_risk:.2f} | realized today {b.day_pnl:+.2f}"
-    )
-    for p in d.db.open_positions():
+    main = desk()
+    for d in (main, main.linked):
+        if d is None:
+            continue
+        b = d.book()
         say(
-            f"position {p['id']} {p['asset']} {p['side']} {p['qty']:g} @ {p['entry_price']:g} "
-            f"stop {p['stop']:g} target {p['take_profit']:g}"
+            f"{d.settings.mode} {d.settings.market} | equity {b.equity:.2f} | free "
+            f"{b.free_quote:.2f} | open risk {b.open_risk:.2f} | realized today {b.day_pnl:+.2f}"
         )
-    for p in d.db.pending_plans():
-        say(f"plan {p['id']} {p['asset']} {p['status']} entry {p['entry']:g}")
+        for p in d.db.open_positions():
+            say(
+                f"  position {p['id']} {p['asset']} {p['side']} {p['qty']:g} @ "
+                f"{p['entry_price']:g} stop {p['stop']:g} target {p['take_profit']:g}"
+            )
+        for p in d.db.pending_plans():
+            say(f"  plan {p['id']} {p['asset']} {p['status']} entry {p['entry']:g}")
 
 
 @app.command()
-def close(position_id: int, reason: str = "manual") -> None:
-    desk().close(position_id, reason)
+def close(position_id: int, reason: str = "manual", futures: bool = False) -> None:
+    pick(futures).close(position_id, reason)
     say(f"position {position_id} closed")
 
 
 @app.command()
-def stop(position_id: int, price: float, reason: str = "manual") -> None:
+def stop(position_id: int, price: float, reason: str = "manual", futures: bool = False) -> None:
     """Move a stop in the trade's favor."""
-    say(str(desk().tighten(position_id, price, reason)))
+    say(str(pick(futures).tighten(position_id, price, reason)))
 
 
 @app.command()

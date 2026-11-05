@@ -46,6 +46,8 @@ class TradeIdea(BaseModel):
     confidence: int = Field(ge=0, le=100)
     thesis: str = Field(max_length=400)
     invalidation: str = Field(max_length=200)
+    # spot or futures when the desk trades both; auto sends shorts to futures, longs to spot
+    venue: Literal["auto", "spot", "futures"] = "auto"
 
     @field_validator("asset")
     @classmethod
@@ -71,6 +73,7 @@ class PositionAction(BaseModel):
     action: Literal["close", "tighten_stop"]
     stop: float | None = None
     reason: str = Field(max_length=200)
+    venue: Literal["spot", "futures"] = "spot"
 
 
 class PlanFile(BaseModel):

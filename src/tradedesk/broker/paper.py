@@ -37,7 +37,7 @@ class PaperBroker:
         realized = self.db.one(
             "SELECT COALESCE(SUM(pnl), 0) AS v FROM positions WHERE status = 'closed'"
         )["v"]
-        return self.settings.paper_equity + realized + self._unrealized()
+        return self.settings.paper_equity + realized + self.db.net_flows() + self._unrealized()
 
     def free_quote(self) -> float:
         if self.settings.market is Market.FUTURES:

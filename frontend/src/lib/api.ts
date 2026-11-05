@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type Run = { id: string; started_at: string; finished_at: string | null; status: string; summary: string | null };
 export type DeskEvent = { id: number; run_id: string; ts: string; actor: string; kind: string; title: string; body: string | null; html: string; refs: string[] };
-export type Plan = Record<string, any> & { id: number; asset: string; side: string; status: string };
-export type Position = Record<string, any> & { id: number; asset: string; side: string };
+export type Plan = Record<string, any> & { id: string; venue?: string; asset: string; side: string; status: string };
+export type Position = Record<string, any> & { id: string; venue?: string; asset: string; side: string };
 export type DeskState = {
   mode: string; market: string; quote: string; auto_execute?: boolean; watchlist?: string[];
   telegram?: { enabled: boolean; configured: boolean };

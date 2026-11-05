@@ -158,17 +158,48 @@ def create_app(desk: Desk) -> FastAPI:
         """Calibration from the outcomes table, read only. `desk learn` or `desk sync` fills it."""
         return learning.stats(db)
 
+    desks = [(desk, "")] + ([(desk.linked, "f")] if desk.linked else [])
+
+    def resolve(ref: str) -> tuple[Desk, int]:
+        target, raw = (desk.linked, ref[1:]) if ref.startswith("f") and desk.linked else (desk, ref)
+        try:
+            return target, int(raw)
+        except ValueError as e:
+            raise HTTPException(404, "unknown id") from e
+
+    def tagged(sql: str) -> list[dict]:
+        rows = []
+        for d, prefix in desks:
+            for r in d.db.all(sql):
+                rows.append({**r, "id": f"{prefix}{r['id']}", "venue": d.settings.market.value})
+        return rows
+
+    def equity_series() -> list[dict]:
+        rows = db.all("SELECT ts, value FROM equity ORDER BY ts DESC LIMIT 200")[::-1]
+        if not desk.linked:
+            return rows
+        other = desk.linked.db.all("SELECT ts, value FROM equity ORDER BY ts")
+        out, i, last = [], 0, 0.0
+        for r in rows:
+            while i < len(other) and other[i]["ts"] <= r["ts"]:
+                last = other[i]["value"]
+                i += 1
+            out.append({"ts": r["ts"], "value": r["value"] + last})
+        return out
+
     @app.get("/api/state")
     def state() -> dict:
-        positions = db.open_positions()
+        positions = tagged("SELECT * FROM positions WHERE status = 'open' ORDER BY opened_at")
         for p in positions:
+            d = desk.linked if p["venue"] == "futures" and desk.linked else desk
             try:
-                p["price"] = desk.broker.price(p["symbol"])
+                p["price"] = d.broker.price(p["symbol"])
             except Exception:
                 p["price"] = None
         return {
             "mode": desk.settings.mode,
             "market": desk.settings.market,
+            "venues": [d.settings.market.value for d, _ in desks],
             "quote": desk.settings.quote,
             "limits": desk.settings.risk.model_dump(),
             "watchlist": desk.settings.watchlist,
@@ -177,47 +208,64 @@ def create_app(desk: Desk) -> FastAPI:
                 "enabled": desk.settings.notify.telegram,
                 "configured": notify.from_env() is not None,
             },
-            "equity": db.all("SELECT ts, value FROM equity ORDER BY ts DESC LIMIT 200")[::-1],
+            "equity": equity_series(),
             "positions": positions,
-            "plans": db.all(
-                "SELECT * FROM plans WHERE status IN ('proposed', 'approved', 'placed', 'rejected')"
-                " AND created_at >= datetime('now', '-3 days') ORDER BY id DESC LIMIT 30"
+            "plans": sorted(
+                tagged(
+                    "SELECT * FROM plans WHERE status IN "
+                    "('proposed', 'approved', 'placed', 'rejected') "
+                    "AND created_at >= datetime('now', '-3 days') ORDER BY id DESC LIMIT 30"
+                ),
+                key=lambda p: p["created_at"],
+                reverse=True,
             ),
-            "closed": db.all(
-                "SELECT * FROM positions WHERE status = 'closed' ORDER BY closed_at DESC LIMIT 15"
-            ),
+            "closed": sorted(
+                tagged(
+                    "SELECT * FROM positions WHERE status = 'closed' "
+                    "ORDER BY closed_at DESC LIMIT 15"
+                ),
+                key=lambda p: p["closed_at"],
+                reverse=True,
+            )[:15],
         }
 
-    @app.post("/api/plans/{plan_id}/approve")
-    def approve(plan_id: int, x_desk: str | None = Header(None)) -> dict:
+    @app.post("/api/plans/{ref}/approve")
+    def approve(ref: str, x_desk: str | None = Header(None)) -> dict:
         guard(x_desk)
+        target, plan_id = resolve(ref)
         try:
-            desk.approve(plan_id)
+            target.approve(plan_id)
         except ValueError as e:
             raise HTTPException(409, str(e)) from e
-        return {"result": desk.execute(only=plan_id)}
+        return {"result": target.execute(only=plan_id)}
 
-    @app.post("/api/plans/{plan_id}/reject")
-    def reject(plan_id: int, x_desk: str | None = Header(None)) -> dict:
+    @app.post("/api/plans/{ref}/reject")
+    def reject(ref: str, x_desk: str | None = Header(None)) -> dict:
         guard(x_desk)
-        desk.reject(plan_id)
+        target, plan_id = resolve(ref)
+        target.reject(plan_id)
         return {"result": "dropped"}
 
-    @app.post("/api/positions/{position_id}/close")
-    def close(position_id: int, x_desk: str | None = Header(None)) -> dict:
+    @app.post("/api/positions/{ref}/close")
+    def close(ref: str, x_desk: str | None = Header(None)) -> dict:
         guard(x_desk)
+        target, position_id = resolve(ref)
         try:
-            desk.close(position_id, "closed from dashboard")
+            target.close(position_id, "closed from dashboard")
         except ValueError as e:
             raise HTTPException(409, str(e)) from e
         return {"result": "closed"}
 
-    @app.post("/api/positions/{position_id}/stop")
-    def move_stop(position_id: int, price: float, x_desk: str | None = Header(None)) -> dict:
+    @app.post("/api/positions/{ref}/stop")
+    def move_stop(ref: str, price: float, x_desk: str | None = Header(None)) -> dict:
         guard(x_desk)
-        if db.one("SELECT id FROM positions WHERE id = ? AND status = 'open'", position_id) is None:
+        target, position_id = resolve(ref)
+        open_row = target.db.one(
+            "SELECT id FROM positions WHERE id = ? AND status = 'open'", position_id
+        )
+        if open_row is None:
             raise HTTPException(404, "no open position with that id")
-        result = desk.tighten(position_id, price, "moved from dashboard")
+        result = target.tighten(position_id, price, "moved from dashboard")
         if result["status"] == "rejected":
             raise HTTPException(409, "; ".join(result["reasons"]))
         return result

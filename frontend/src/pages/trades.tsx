@@ -25,8 +25,8 @@ export default function Trades() {
   const plans = s?.plans ?? [], positions = s?.positions ?? [], closed = s?.closed ?? [];
   const waiting = plans.filter((p) => p.status === "proposed").length;
   const [tab, setTab] = useState<(typeof TABS)[number]>(waiting ? "Plans" : positions.length ? "Positions" : "Plans");
-  const [open, setOpen] = useState<number | null>(null);
-  const [stops, setStops] = useState<Record<number, string>>({});
+  const [open, setOpen] = useState<string | null>(null);
+  const [stops, setStops] = useState<Record<string, string>>({});
   const counts: Record<string, number> = { Plans: plans.length, Positions: positions.length, History: closed.length, Replay: 0 };
   const wins = closed.filter((p) => p.pnl > 0).length;
   const realized = closed.reduce((a, p) => a + (p.pnl || 0), 0);
@@ -67,7 +67,7 @@ export default function Trades() {
                   {plans.map((p) => (
                     <Fragment key={p.id}>
                       <tr className="cursor-pointer hover:bg-raised/40" onClick={() => setOpen(open === p.id ? null : p.id)}>
-                        <Td className="font-semibold"><Link to={`/markets/${p.asset}`} onClick={(e) => e.stopPropagation()} className="hover:underline">{p.asset}</Link></Td>
+                        <Td className="font-semibold"><Link to={`/markets/${p.asset}`} onClick={(e) => e.stopPropagation()} className="hover:underline">{p.asset}</Link>{p.venue === "futures" && <span className="ml-1.5 rounded bg-warn/12 px-1 py-px text-[10px] font-medium text-warn">futures{p.leverage > 1 ? ` ${p.leverage}x` : ""}</span>}</Td>
                         <Td className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</Td>
                         <Td className="text-dim">{p.horizon}</Td>
                         <Td right>{px(p.entry)}</Td><Td right className="text-down">{px(p.stop)}</Td><Td right className="text-up">{px(p.take_profit)}</Td>
@@ -109,7 +109,7 @@ export default function Trades() {
                     const pnl = p.price == null ? 0 : (p.price - p.entry_price) * p.qty * sg;
                     return (
                       <tr key={p.id} className="hover:bg-raised/40">
-                        <Td className="font-semibold"><Link to={`/markets/${p.asset}`} className="hover:underline">{p.asset}</Link> <span className="text-xs font-normal text-dim">{p.horizon}</span></Td>
+                        <Td className="font-semibold"><Link to={`/markets/${p.asset}`} className="hover:underline">{p.asset}</Link> <span className="text-xs font-normal text-dim">{p.horizon}</span>{p.venue === "futures" && <span className="ml-1.5 rounded bg-warn/12 px-1 py-px text-[10px] font-medium text-warn">futures{p.leverage > 1 ? ` ${p.leverage}x` : ""}</span>}</Td>
                         <Td className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</Td>
                         <Td right>{px(p.qty)}</Td><Td right>{px(p.entry_price)}</Td><Td right>{px(p.price)}</Td>
                         <Td right className="text-down">{px(p.stop)}</Td><Td right className="text-up">{px(p.take_profit)}</Td>
@@ -142,7 +142,7 @@ export default function Trades() {
                   {closed.map((p) => (
                     <tr key={p.id} className="hover:bg-raised/40">
                       <Td className="font-mono text-dim">{String(p.closed_at).slice(5, 16).replace("T", " ")}</Td>
-                      <Td className="font-semibold">{p.asset}</Td>
+                      <Td className="font-semibold">{p.asset}{p.venue === "futures" && <span className="ml-1.5 rounded bg-warn/12 px-1 py-px text-[10px] font-medium text-warn">futures{p.leverage > 1 ? ` ${p.leverage}x` : ""}</span>}</Td>
                       <Td className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</Td>
                       <Td right>{px(p.entry_price)}</Td><Td right>{px(p.exit_price)}</Td>
                       <Td className="text-dim">{p.exit_reason}</Td>

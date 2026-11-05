@@ -124,6 +124,13 @@ CREATE TABLE IF NOT EXISTS run_universe (
     assets TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS flows (
+    id INTEGER PRIMARY KEY,
+    ts TEXT NOT NULL,
+    amount REAL NOT NULL,
+    kind TEXT NOT NULL,
+    note TEXT
+);
 CREATE INDEX IF NOT EXISTS events_run ON events(run_id, id);
 CREATE INDEX IF NOT EXISTS plans_status ON plans(status);
 CREATE INDEX IF NOT EXISTS positions_status ON positions(status);
@@ -238,8 +245,25 @@ class Database:
             c.execute("INSERT OR REPLACE INTO equity (ts, value) VALUES (?, ?)", (now(), value))
 
     def peak_equity(self) -> float | None:
-        row = self.one("SELECT MAX(value) AS v FROM equity")
-        return row["v"] if row else None
+        """Highest equity, with money moved in or out since then counted as if it was there."""
+        row = self.one(
+            "SELECT MAX(e.value - COALESCE((SELECT SUM(f.amount) FROM flows f "
+            "WHERE f.ts <= e.ts), 0)) AS v FROM equity e"
+        )
+        if not row or row["v"] is None:
+            return None
+        return row["v"] + self.net_flows()
+
+    def net_flows(self) -> float:
+        row = self.one("SELECT COALESCE(SUM(amount), 0) AS v FROM flows")
+        return row["v"] if row else 0.0
+
+    def record_flow(self, amount: float, kind: str, note: str = "") -> None:
+        with self.tx() as c:
+            c.execute(
+                "INSERT INTO flows (ts, amount, kind, note) VALUES (?, ?, ?, ?)",
+                (now(), amount, kind, note),
+            )
 
     def realized_since(self, iso_ts: str) -> float:
         row = self.one(

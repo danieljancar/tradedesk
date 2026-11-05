@@ -314,9 +314,9 @@ export function BottomTabs({ state, events, refresh, onPick }: { state: DeskStat
   const waiting = plans.filter((p) => p.status === "proposed").length;
   const [tab, setTab] = useState<"plans" | "positions" | "history" | "log">("positions");
   useEffect(() => { if (waiting) setTab("plans"); }, [waiting]);
-  const [busy, setBusy] = useState<number | null>(null);
-  const [open, setOpen] = useState<number | null>(null);
-  const act = async (path: string, id: number, ok: string) => {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const act = async (path: string, id: string, ok: string) => {
     setBusy(id);
     try { await api(path, "POST"); toast.success(ok); } catch (e: any) { toast.error(e.message); }
     setBusy(null);
@@ -345,7 +345,7 @@ export function BottomTabs({ state, events, refresh, onPick }: { state: DeskStat
               const pnl = p.price == null ? 0 : (p.price - p.entry_price) * p.qty * s;
               return (
                 <tr key={p.id} className="hover:bg-raised/50">
-                  <Td className="font-medium">{p.asset}/USDT <span className="text-[11px] text-dim">{p.horizon}</span></Td>
+                  <Td className="font-medium">{p.asset}/USDT <span className="text-[11px] text-dim">{p.horizon}</span>{p.venue === "futures" && <span className="ml-1.5 rounded bg-warn/12 px-1 py-px text-[10px] font-medium text-warn">futures{p.leverage > 1 ? ` ${p.leverage}x` : ""}</span>}</Td>
                   <Td className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</Td>
                   <Td right>{px(p.qty)}</Td><Td right>{px(p.entry_price)}</Td><Td right>{px(p.price)}</Td>
                   <Td right className="text-down">{px(p.stop)}</Td><Td right className="text-up">{px(p.take_profit)}</Td>
@@ -366,7 +366,7 @@ export function BottomTabs({ state, events, refresh, onPick }: { state: DeskStat
             {plans.map((p: Plan) => (
               <Fragment key={p.id}>
                 <tr className="cursor-pointer hover:bg-raised/50" onClick={() => setOpen(open === p.id ? null : p.id)}>
-                  <Td className="font-medium">{p.asset}/USDT</Td>
+                  <Td className="font-medium">{p.asset}/USDT{p.venue === "futures" && <span className="ml-1.5 rounded bg-warn/12 px-1 py-px text-[10px] font-medium text-warn">futures{p.leverage > 1 ? ` ${p.leverage}x` : ""}</span>}</Td>
                   <Td className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</Td>
                   <Td className="text-dim">{p.horizon}</Td>
                   <Td right>{px(p.entry)}</Td><Td right className="text-down">{px(p.stop)}</Td><Td right className="text-up">{px(p.take_profit)}</Td>

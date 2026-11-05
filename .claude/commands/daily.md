@@ -37,6 +37,8 @@ Assets marked `scan` in universe.md are candidates the scanner found by momentum
 
 When book.md says shorts are allowed, judge both directions for every asset. A falling market is an opportunity on the short side, not a reason to sit out: a clean downtrend with a stop above a real level and a target at the next support is a valid idea. Short horizon (days, 4h levels) is fine when the setup is there. Pass on an asset only when neither side clears the minimum reward to risk at real levels.
 
+When book.md has a futures wallet section, the desk trades two wallets from this one decision. Spot holds longs without leverage and the core. Futures takes shorts and leveraged trades, one position per coin. Every idea can set `"venue"`: leave it out and shorts go to futures, longs to spot. Send a long to futures only when it is short horizon with a tight stop, where leverage is worth its risk. To act on a futures position, add `"venue": "futures"` to the position action, since the two wallets number their positions separately.
+
 Write `<run>/plans.json`:
 
 ```json
@@ -54,11 +56,12 @@ Write `<run>/plans.json`:
       "take_profit": 0,
       "confidence": 70,
       "thesis": "why, with the numbers that matter, max 400 chars",
-      "invalidation": "what kills the idea, max 200 chars"
+      "invalidation": "what kills the idea, max 200 chars",
+      "venue": "spot"
     }
   ],
   "position_actions": [
-    {"position_id": 1, "action": "tighten_stop", "stop": 0, "reason": "max 200 chars"}
+    {"position_id": 1, "action": "tighten_stop", "stop": 0, "reason": "max 200 chars", "venue": "spot"}
   ]
 }
 ```

@@ -43,7 +43,8 @@ class RiskLimits(BaseModel):
     min_confidence: int = Field(60, ge=0, le=100)
     max_entry_distance_pct: float = Field(8.0, gt=0)
     # House money: principal is risked at risk_per_trade_pct, profits above it at profit_risk_pct.
-    principal: float | None = Field(None, gt=0)
+    # 0 suits a wallet that starts empty and is filled by transfers
+    principal: float | None = Field(None, ge=0)
     profit_risk_pct: float = Field(0.0, ge=0, le=25)
     # Conviction: risk grows from 1x at min_confidence to confident_risk_x at confident_at.
     confident_risk_x: float = Field(1.0, ge=1, le=3)
@@ -83,6 +84,16 @@ class Trailing(BaseModel):
     trail_atr: float = Field(2.0, gt=0)
     lock_pct: float = Field(50.0, ge=0, lt=100)
     min_step_atr: float = Field(0.25, ge=0)
+
+
+class Transfers(BaseModel):
+    """Keeps the spot and futures wallets at a target split by moving free USDT between them."""
+
+    enabled: bool = False
+    futures_pct: float = Field(35.0, gt=0, lt=100)
+    band_pct: float = Field(10.0, gt=0, le=50)
+    min_amount: float = Field(5.0, gt=0)
+    keep_free_pct: float = Field(10.0, ge=0, le=50)
 
 
 class Universe(BaseModel):
@@ -176,6 +187,9 @@ class Settings(BaseModel):
     universe: Universe = Universe()
     notify: Notify = Notify()
     portfolio: Portfolio = Portfolio()
+    # a second config for the futures wallet; one run then trades both
+    futures_desk: Path | None = None
+    transfers: Transfers = Transfers()
 
     @model_validator(mode="after")
     def core_not_quote(self) -> "Settings":
@@ -204,9 +218,31 @@ def load_env(path: Path) -> None:
 @lru_cache
 def settings() -> Settings:
     load_env(ROOT / ".env")
-    path = Path(os.environ.get("DESK_CONFIG", ROOT / "desk.toml"))
+    return load(Path(os.environ.get("DESK_CONFIG", ROOT / "desk.toml")))
+
+
+def load(path: Path) -> Settings:
     data = tomllib.loads(path.read_text()) if path.exists() else {}
     return Settings.model_validate(data)
+
+
+def linked_settings(main: Settings) -> Settings | None:
+    """The futures wallet's settings. Runs and mode always follow the main desk."""
+    if main.futures_desk is None:
+        return None
+    if main.market is Market.FUTURES:
+        raise ValueError("futures_desk needs the main desk on market = spot")
+    s = load(main.path(main.futures_desk))
+    return s.model_copy(
+        update={
+            "market": Market.FUTURES,
+            "mode": main.mode,
+            "runs_dir": main.runs_dir,
+            "futures_desk": None,
+            "watchlist": main.watchlist,
+            "universe": main.universe,
+        }
+    )
 
 
 def api_keys() -> tuple[str, str]:

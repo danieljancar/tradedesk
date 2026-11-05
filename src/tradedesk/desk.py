@@ -13,6 +13,7 @@ from tradedesk import (
     risk,
     snapshot,
     trailing,
+    transfers,
     universe,
 )
 from tradedesk.binance import market_data
@@ -21,7 +22,7 @@ from tradedesk.broker.base import CloseFailed, Unprotected
 from tradedesk.config import Horizon, Market, Settings
 from tradedesk.db import Database, now
 from tradedesk.indicators import atr
-from tradedesk.models import PlanFile, TradeIdea
+from tradedesk.models import PlanFile, Side, TradeIdea
 
 CORE_ACTION = "core lots change only through rebalancing"
 
@@ -53,6 +54,28 @@ class Desk:
         self.db = db
         self._broker = broker
         self.listeners: list[Callable[[dict], None]] = []
+        self.linked: Desk | None = None
+        self.events = db
+        self.label = ""
+
+    def link(self, futures: "Desk") -> None:
+        """Trade a futures wallet from the same runs: one analysis, one floor, two books."""
+        futures.events = self.db
+        futures.listeners = self.listeners
+        futures.label = "Futures: "
+        self.linked = futures
+
+    def venue_of(self, idea: TradeIdea) -> "Desk":
+        if self.linked is None:
+            return self
+        if idea.venue == "futures" or (idea.venue == "auto" and idea.side is Side.SHORT):
+            return self.linked
+        return self
+
+    def _also(self, method: str, *args) -> list[str]:
+        if self.linked is None:
+            return []
+        return [f"futures: {line}" for line in getattr(self.linked, method)(*args)]
 
     @property
     def broker(self) -> Broker:
@@ -70,8 +93,10 @@ class Desk:
         return path
 
     def log(self, actor: str, kind: str, title: str, body: str | None = None, refs=None) -> None:
-        run_id = self.run_id()
-        event_id = self.db.log(run_id, actor, kind, title, body, refs)
+        run = self.events.latest_run()
+        run_id = run["id"] if run else None
+        title = f"{self.label}{title}"
+        event_id = self.events.log(run_id, actor, kind, title, body, refs)
         event = dict(
             id=event_id,
             run_id=run_id,
@@ -87,12 +112,17 @@ class Desk:
             except Exception as e:
                 print(f"listener failed: {e}", file=sys.stderr)
 
-    def start_run(self) -> str:
-        run_id = datetime.now(UTC).strftime("%Y-%m-%dT%H%M")
+    def start_run(self, run_id: str | None = None) -> str:
+        run_id = run_id or datetime.now(UTC).strftime("%Y-%m-%dT%H%M")
         if self.db.one("SELECT id FROM runs WHERE id = ?", run_id) is None:
             self.db.insert("runs", id=run_id, started_at=now())
         self.run_dir(run_id)
+        linked = self.linked
+        if linked and linked.db.one("SELECT id FROM runs WHERE id = ?", run_id) is None:
+            linked.db.insert("runs", id=run_id, started_at=now())
         mode = f"{self.settings.mode} {self.settings.market}"
+        if self.linked is not None:
+            mode += " and futures"
         self.log("desk", "start", f"Run {run_id} started ({mode})")
         return run_id
 
@@ -100,6 +130,12 @@ class Desk:
         run_id = self.run_id()
         if run_id:
             self.db.update("runs", run_id, finished_at=now(), status="done", summary=summary)
+            if self.linked is not None and self.linked.db.one(
+                "SELECT id FROM runs WHERE id = ?", run_id
+            ):
+                self.linked.db.update(
+                    "runs", run_id, finished_at=now(), status="done", summary=summary
+                )
             self.log("desk", "done", "Run finished", summary)
 
     def post(self, actor: str, file: Path | None, start: bool = False, reads=None) -> None:
@@ -212,7 +248,12 @@ class Desk:
             taken=taken,
             allowed=allowed,
             sleeve_equity=equity * (1 - core_pct / 100) if core_pct > 0 else None,
+            principal=self.principal(),
         )
+
+    def principal(self) -> float | None:
+        base = self.settings.risk.principal
+        return None if base is None else max(0.0, base + self.db.net_flows())
 
     def write_book(self) -> Path:
         run_dir = self.run_dir(self.run_id() or self.start_run())
@@ -227,7 +268,7 @@ class Desk:
             f"min reward/risk "
             f"{limits.min_reward_risk}, max {limits.max_open_positions} positions, "
             f"min confidence {limits.min_confidence}, shorts "
-            f"{'allowed' if self.settings.market == 'futures' else 'not allowed (spot)'}",
+            f"{'allowed' if self.settings.market == 'futures' else self._shorts_note()}",
             "max hold days: "
             + ", ".join(f"{k} {v}" for k, v in self.settings.hold_days.model_dump().items()),
             trailing_line(self.settings),
@@ -243,24 +284,11 @@ class Desk:
             lines.append("NEW TRADES BLOCKED: " + "; ".join(blocks))
         lines.append("## Open positions")
         opened = self.db.open_positions()
-        for p in opened:
-            price = self.broker.price(p["symbol"])
-            sign = 1 if p["side"] == "long" else -1
-            r_mult = (price - p["entry_price"]) * sign / abs(p["entry_price"] - p["initial_stop"])
-            days = (datetime.now(UTC) - datetime.fromisoformat(p["opened_at"])).days
-            lines.append(
-                f"- id {p['id']} {p['asset']} {p['side']} {p['horizon']} | entry "
-                f"{p['entry_price']:.6g} now {price:.6g} ({r_mult:+.2f}R) | stop {p['stop']:.6g} "
-                f"target {p['take_profit']:.6g} | held {days}d"
-            )
-        if not opened:
-            lines.append("- none (flat)")
+        lines += self._open_lines(opened)
         lines.append("## Pending entries")
-        for p in self.db.pending_plans():
-            lines.append(
-                f"- plan {p['id']} {p['asset']} {p['side']} {p['horizon']} entry {p['entry']:.6g} "
-                f"stop {p['stop']:.6g} target {p['take_profit']:.6g} ({p['status']})"
-            )
+        lines += self._pending_lines()
+        if self.linked is not None:
+            lines += self.linked.wallet_lines()
         lines.append("## Last closed trades")
         closed = self.db.all(
             "SELECT * FROM positions WHERE status = 'closed' ORDER BY closed_at DESC LIMIT 8"
@@ -285,6 +313,56 @@ class Desk:
         self.log("book", "output", f"Equity {b.equity:.2f}, {len(opened)} open", text)
         return run_dir / "book.md"
 
+    def _shorts_note(self) -> str:
+        if self.linked is None:
+            return "not allowed (spot)"
+        return 'go to the futures wallet below, set "venue" per idea'
+
+    def _open_lines(self, opened: list[dict]) -> list[str]:
+        lines = []
+        for p in opened:
+            price = self.broker.price(p["symbol"])
+            sign = 1 if p["side"] == "long" else -1
+            r_mult = (price - p["entry_price"]) * sign / abs(p["entry_price"] - p["initial_stop"])
+            days = (datetime.now(UTC) - datetime.fromisoformat(p["opened_at"])).days
+            lines.append(
+                f"- id {p['id']} {p['asset']} {p['side']} {p['horizon']} | entry "
+                f"{p['entry_price']:.6g} now {price:.6g} ({r_mult:+.2f}R) | stop {p['stop']:.6g} "
+                f"target {p['take_profit']:.6g} | held {days}d"
+            )
+        return lines or ["- none (flat)"]
+
+    def _pending_lines(self) -> list[str]:
+        return [
+            f"- plan {p['id']} {p['asset']} {p['side']} {p['horizon']} entry {p['entry']:.6g} "
+            f"stop {p['stop']:.6g} target {p['take_profit']:.6g} ({p['status']})"
+            for p in self.db.pending_plans()
+        ]
+
+    def wallet_lines(self) -> list[str]:
+        """This desk as a section of the main book, when it trades as the linked futures wallet."""
+        b = self.book()
+        limits = self.settings.risk
+        lines = [
+            '## Futures wallet (ideas with "venue": "futures", and shorts by default)',
+            f"equity {b.equity:.2f} | free {b.free_quote:.2f} | realized today {b.day_pnl:+.2f} "
+            f"| open risk {b.open_risk:.2f} ({b.open_risk / b.equity * 100 if b.equity else 0:.1f}%"
+            f" of {limits.max_total_risk_pct}%)",
+            f"rules: risk {limits.risk_per_trade_pct}% per trade{conviction_note(limits)}, "
+            f"min reward/risk {limits.min_reward_risk}, max {limits.max_open_positions} positions, "
+            f"leverage up to {limits.max_leverage}x, one position per coin, shorts allowed",
+        ]
+        blocks = risk.account_blocks(self.settings, b)
+        if blocks:
+            lines.append("NEW FUTURES TRADES BLOCKED: " + "; ".join(blocks))
+        lines.append(
+            'Open futures positions (to act on one, give "venue": "futures" in position_actions)'
+        )
+        lines += self._open_lines(self.db.open_positions())
+        lines.append("Pending futures entries")
+        lines += self._pending_lines() or ["- none"]
+        return lines
+
     def _facts(self) -> dict:
         run_id = self.run_id()
         path = self.run_dir(run_id) / "facts.json" if run_id else None
@@ -294,15 +372,19 @@ class Desk:
         run_id = self.run_id()
         plan_file = PlanFile.model_validate_json(file.read_text())
         self.log("risk", "start", f"Checking {len(plan_file.ideas)} ideas against the rules")
-        facts, book, results = self._facts(), self.book(), []
+        facts, results, books = self._facts(), [], {}
         for idea in plan_file.ideas:
-            results.append(self._check_idea(run_id, idea, book, facts))
+            target = self.venue_of(idea)
+            book = books.get(id(target)) or books.setdefault(id(target), target.book())
+            r = target._check_idea(run_id, idea, book, facts)
+            results.append({**r, "venue": target.settings.market.value})
+            if target.settings.execution.auto_execute and r.get("status") == "proposed":
+                target.approve(r["id"])
+                results[-1]["status"] = "approved"
         for action in plan_file.position_actions:
-            results.append(self._position_action(action.model_dump()))
-        if self.settings.execution.auto_execute:
-            for r in results:
-                if r.get("status") == "proposed":
-                    self.approve(r["id"])
+            target = self.linked if action.venue == "futures" and self.linked else self
+            r = target._position_action(action.model_dump())
+            results.append({**r, "venue": target.settings.market.value})
         passed = sum(r.get("status") in ("proposed", "approved") for r in results)
         failed = sum(r.get("status") == "rejected" for r in results)
         summary = f"{passed} passed, {failed} rejected" if results else "Nothing to check"
@@ -536,6 +618,8 @@ class Desk:
                     f"{plan['stop']:g} and target {plan['take_profit']:g} on the exchange",
                 )
                 out.append(f"plan {plan['id']}: entry order resting at {plan['entry']}")
+        if only is None and trim is None:
+            out += self._also("execute")
         return out
 
     def _open_position(self, plan: dict, fill: Fill) -> int:
@@ -595,6 +679,13 @@ class Desk:
             self.learn(stale_after=timedelta(hours=1))
         except Exception as e:
             self.log("desk", "error", "Outcome update failed", str(e))
+        out += self._also("sync")
+        if self.linked is not None and self.settings.transfers.enabled:
+            try:
+                out += transfers.balance(self, self.linked)
+            except Exception as e:
+                self.log("exchange", "error", "Wallet transfer failed", str(e))
+                out.append(f"transfer failed: {e}")
         return out
 
     def learn(self, stale_after: timedelta | None = None) -> dict:
@@ -713,7 +804,7 @@ class Desk:
                 self.close(pos["id"], "kill switch")
                 out.append(f"position {pos['id']} closed")
         self.log("desk", "kill", "Kill switch", "\n".join(out))
-        return out
+        return out + self._also("kill", flatten)
 
     def rebalance(self, propose: bool = False) -> dict:
         """Core targets against holdings. With propose, buys become plans and trims wait."""
