@@ -17,6 +17,7 @@ For each asset write at most 70 words under `## <ASSET>`, or at most 45 words wh
 - trend on 4h, 1d and 1w in one line (up, down or range, with the EMA stack that shows it)
 - momentum and volatility: RSI, MACD histogram sign, ATR as % of price
 - the two levels that matter most, one below and one above, taken from the levels lines
+- the 4h and 1d pattern lines when one is clear, and whether price is inside or broke out
 - derivatives: funding, open interest trend, long/short ratio, and what crowding they show
 - bias for short (days), mid (weeks) and long (months) as up, down or none
 

@@ -27,15 +27,18 @@ function ema(values: number[], period: number) {
   });
 }
 
-export type Overlay = { ema: boolean; volume: boolean; levels: boolean; plans: boolean; mine: boolean };
+export type Overlay = { ema: boolean; volume: boolean; levels: boolean; plans: boolean; mine: boolean; patterns: boolean };
+export type SegmentSpec = { t1: number; p1: number; t2: number; p2: number; color: string };
+export type BoxSpec = { from: number; entry: number; stop: number; target: number; up: string; down: string };
 export type LineSpec = { price: number; title: string; color: string; style?: "solid" | "dashed" | "dotted"; width?: 1 | 2 | 3 };
 export type MarkerSpec = { time: number; text: string; color: string; position: "aboveBar" | "belowBar"; shape: "arrowUp" | "arrowDown" | "circle" };
 
-export function MarketChart({ asset, tf, overlay, lines, markers, drawing, onPick, onHover }: {
-  asset: string; tf: string; overlay: Overlay; lines: LineSpec[]; markers: MarkerSpec[];
+export function MarketChart({ asset, tf, overlay, lines, markers, segments = [], boxes = [], drawing, onPick, onHover }: {
+  asset: string; tf: string; overlay: Overlay; lines: LineSpec[]; markers: MarkerSpec[]; segments?: SegmentSpec[]; boxes?: BoxSpec[];
   drawing: boolean; onPick: (price: number) => void; onHover?: (c: Candle | null) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  const paint = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const pickRef = useRef(onPick);
@@ -109,6 +112,35 @@ export function MarketChart({ asset, tf, overlay, lines, markers, drawing, onPic
       .flatMap((m) => { const bt = barOf(m.time); return bt == null ? [] : [{ time: bt as UTCTimestamp, position: m.position, shape: m.shape, color: m.color, text: m.text }]; })
       .sort((a, b) => a.time - b.time);
     if (ms.length) createSeriesMarkers(candles, ms);
+    for (const sg of segments) {
+      const a = barOf(sg.t1), b = barOf(sg.t2);
+      if (a == null || b == null || a >= b) continue;
+      chart.addSeries(LineSeries, { color: sg.color, lineWidth: 2, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+        .setData([{ time: a as UTCTimestamp, value: sg.p1 }, { time: b as UTCTimestamp, value: sg.p2 }]);
+    }
+    // plan and position zones, drawn on a canvas over the chart: green to the target, red to the stop
+    let frame = 0;
+    const draw = () => {
+      const cv = paint.current, el = box.current;
+      if (cv && el) {
+        const w = el.clientWidth, h = el.clientHeight, dpr = devicePixelRatio || 1;
+        if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+        const g = cv.getContext("2d")!;
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, w, h);
+        const right = w - (chart.priceScale("right").width() || 0);
+        for (const bx of boxes) {
+          const t = barOf(bx.from) ?? data[0].time;
+          const x = chart.timeScale().timeToCoordinate(t as UTCTimestamp) ?? 0;
+          const ye = candles.priceToCoordinate(bx.entry), ys = candles.priceToCoordinate(bx.stop), yt = candles.priceToCoordinate(bx.target);
+          if (ye == null || ys == null || yt == null || x >= right) continue;
+          g.fillStyle = bx.up; g.fillRect(x, Math.min(ye, yt), right - x, Math.abs(yt - ye));
+          g.fillStyle = bx.down; g.fillRect(x, Math.min(ye, ys), right - x, Math.abs(ys - ye));
+        }
+      }
+      frame = requestAnimationFrame(draw);
+    };
+    if (boxes.length) frame = requestAnimationFrame(draw);
     chart.subscribeClick((param) => {
       if (!drawRef.current || !param.point) return;
       const price = candles.coordinateToPrice(param.point.y);
@@ -135,15 +167,16 @@ export function MarketChart({ asset, tf, overlay, lines, markers, drawing, onPic
       candles.update(bar);
       vol?.update({ time, value: +k.v, color: bar.close >= bar.open ? us : ds });
     };
-    return () => { ws.close(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
+    return () => { cancelAnimationFrame(frame); paint.current?.getContext("2d")?.clearRect(0, 0, 1e5, 1e5); ws.close(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, tf, overlay.ema, overlay.volume, JSON.stringify(lines), JSON.stringify(markers), scheme]);
+  }, [data, tf, overlay.ema, overlay.volume, JSON.stringify(lines), JSON.stringify(markers), JSON.stringify(segments), JSON.stringify(boxes), scheme]);
 
   if (err) return <p className="grid h-full place-items-center text-sm text-dim">Couldn't load candles: {err}</p>;
   return (
     <div className="relative h-full w-full">
       {!data && <Skeleton className="absolute inset-0 rounded-none" />}
       <div ref={box} className={"absolute inset-0 " + (drawing ? "cursor-crosshair" : "")} />
+      <canvas ref={paint} className="pointer-events-none absolute inset-0 h-full w-full" />
     </div>
   );
 }

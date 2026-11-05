@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import httpx
 
-from tradedesk import universe
+from tradedesk import patterns, universe
 from tradedesk.binance.market import MarketData
 from tradedesk.config import Settings
 from tradedesk.indicators import Candle, atr, ema, macd_hist, pct, rsi, swing_levels
@@ -61,6 +61,7 @@ def asset_block(md: MarketData, symbol: str) -> tuple[str, dict]:
     sup, res = swing_levels(daily[-120:])
     sup4, res4 = swing_levels(four[-120:])
     recent = four[-30:]
+    shapes = {"4h": patterns.find(four), "1d": patterns.find(daily)}
     lines = [
         f"## {symbol} price {num(price)} | 24h {change(1)} 7d {change(7)} 30d {change(30)} "
         f"90d {change(90)}",
@@ -72,6 +73,7 @@ def asset_block(md: MarketData, symbol: str) -> tuple[str, dict]:
         f"4h range last 5d: {num(min(c.low for c in recent))} to "
         f"{num(max(c.high for c in recent))}",
         "daily closes (old to new): " + " ".join(num(c) for c in closes[-14:]),
+        *(patterns.line(tf, p, num) for tf, p in shapes.items()),
     ]
     deriv = md.derivatives(symbol)
     if deriv:
@@ -96,6 +98,7 @@ def asset_block(md: MarketData, symbol: str) -> tuple[str, dict]:
         "range_5d": [min(c.low for c in recent), max(c.high for c in recent)],
         "closes": closes[-14:],
         "derivatives": deriv,
+        "patterns": shapes,
     }
     return "\n".join(lines), facts
 

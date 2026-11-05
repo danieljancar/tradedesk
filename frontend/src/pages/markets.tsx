@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Box, Page } from "@/components/shell";
-import { MarketChart, cssColor, type LineSpec, type MarkerSpec, type Overlay } from "@/components/market-chart";
+import { MarketChart, cssColor, type BoxSpec, type LineSpec, type MarkerSpec, type Overlay, type SegmentSpec } from "@/components/market-chart";
 import { Positioning } from "@/components/positioning";
 import { Prose } from "@/components/prose";
 import { Term } from "@/components/term";
@@ -43,7 +43,7 @@ export default function Markets() {
   const asset = (param ?? d.watch[0] ?? "BTC").toUpperCase();
   const ticks = useTickers(d.watch);
   const [tf, setTf] = useState<(typeof TFS)[number]>("4h");
-  const [ov, setOv] = useState<Overlay>({ ema: true, volume: true, levels: true, plans: true, mine: true });
+  const [ov, setOv] = useState<Overlay>({ ema: true, volume: true, levels: true, plans: true, mine: true, patterns: true });
   const [drawing, setDrawing] = useState(false);
   const [pending, setPending] = useState<number | null>(null);
   const [label, setLabel] = useState("");
@@ -88,6 +88,25 @@ export default function Markets() {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ov, f, tf, JSON.stringify(plans), JSON.stringify(open), JSON.stringify(mine), Math.round((t?.price ?? 0) / 100)]);
+
+  const frame = tf === "1h" || tf === "4h" ? "4h" : "1d";
+  const shape = f?.patterns?.[frame];
+  const segments = useMemo<SegmentSpec[]>(() => {
+    if (!ov.patterns || !shape) return [];
+    const c = cssColor("--ema200");
+    return (["upper", "lower"] as const).map((k) => ({ t1: shape[k].t1, p1: shape[k].p1, t2: shape[k].t_end, p2: shape[k].p_end, color: c }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ov.patterns, JSON.stringify(shape)]);
+
+  const boxes = useMemo<BoxSpec[]>(() => {
+    if (!ov.plans) return [];
+    const up = cssColor("--up", 0.12), down = cssColor("--down", 0.12);
+    return [
+      ...plans.filter((p) => ["proposed", "approved", "placed"].includes(p.status)).map((p) => ({ from: ts(p.created_at), entry: p.entry, stop: p.stop, target: p.take_profit, up, down })),
+      ...open.map((p) => ({ from: ts(p.opened_at), entry: p.entry_price, stop: p.stop, target: p.take_profit, up, down })),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ov.plans, JSON.stringify(plans), JSON.stringify(open)]);
 
   const markers = useMemo<MarkerSpec[]>(() => {
     if (!ov.plans) return [];
@@ -170,6 +189,7 @@ export default function Markets() {
               <Toggle on={ov.ema} onClick={() => setOv({ ...ov, ema: !ov.ema })} swatch="var(--ema20)">EMA 20/50/200</Toggle>
               <Toggle on={ov.volume} onClick={() => setOv({ ...ov, volume: !ov.volume })}>Volume</Toggle>
               <Toggle on={ov.levels} onClick={() => setOv({ ...ov, levels: !ov.levels })} swatch="var(--up)">Desk levels</Toggle>
+              <Toggle on={ov.patterns} onClick={() => setOv({ ...ov, patterns: !ov.patterns })} swatch="var(--ema200)">Patterns</Toggle>
               <Toggle on={ov.plans} onClick={() => setOv({ ...ov, plans: !ov.plans })} swatch="var(--brand)">Plans &amp; trades</Toggle>
               <Toggle on={ov.mine} onClick={() => setOv({ ...ov, mine: !ov.mine })} swatch="var(--ema50)">My levels</Toggle>
               <Button size="sm" variant={drawing ? "default" : "outline"} className="ml-auto h-7 gap-1.5 text-xs" onClick={() => { setDrawing(!drawing); setPending(null); }}>
@@ -185,7 +205,7 @@ export default function Markets() {
               </form>
             )}
             <div className="h-[56vh] min-h-[360px]">
-              <MarketChart asset={asset} tf={tf} overlay={ov} lines={lines} markers={markers} drawing={drawing} onPick={setPending} onHover={setHover} />
+              <MarketChart asset={asset} tf={tf} overlay={ov} lines={lines} markers={markers} segments={segments} boxes={boxes} drawing={drawing} onPick={setPending} onHover={setHover} />
             </div>
           </section>
 
@@ -194,6 +214,7 @@ export default function Markets() {
               {techRead ? <Prose html={techRead.replace(/^## (.*)$/m, "").trim().split("\n").map((l) => `<p>${l.replace(/</g, "&lt;")}</p>`).join("")} className="text-[13px]" />
                 : <p className="text-sm text-dim">No chart read for {asset} in the latest run. Run the desk to get one.</p>}
               {r && <p className="mt-3 rounded-md bg-sunk px-3 py-2 text-[13px]">{r.headline}</p>}
+              {shape && <p className="mt-2 text-[13px]"><span className="text-dim">Pattern {frame}:</span> {shape.pattern}, price {shape.position}</p>}
             </Box>
             <Box title={`Plans and trades on ${asset}`}>
               {!plans.length && !open.length && !closed.length && <p className="text-sm text-dim">Nothing yet on {asset}.</p>}
@@ -232,7 +253,7 @@ export default function Markets() {
               {mine.map((n) => (
                 <li key={n.id} className="group flex items-start gap-2 rounded-md bg-sunk px-2.5 py-1.5 text-[13px]">
                   <span className="flex-1">{n.price != null && <b className="mr-1.5 font-mono">{px(n.price)}</b>}{n.text}</span>
-                  <button type="button" onClick={() => d.dropNote(n.id)} aria-label="Remove" className="text-dim opacity-60 hover:text-down hover:opacity-100"><Trash2 className="size-3.5" /></button>
+                  <button type="button" onClick={() => d.dropNote(n.id)} aria-label={`Delete ${n.text}`} className="-my-1 -mr-1.5 grid size-7 shrink-0 place-items-center rounded-md text-dim hover:bg-down/10 hover:text-down"><Trash2 className="size-4" /></button>
                 </li>
               ))}
               {!mine.length && <li className="text-xs text-dim">Use "Draw level" or add a note.</li>}
