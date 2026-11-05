@@ -78,7 +78,7 @@ export function useDesk() {
 
   useEffect(() => { tick(); loadState(); }, [tick, loadState]);
   useInterval(tick, 2500);
-  useInterval(loadState, 15000);
+  useInterval(loadState, 5000);
 
   return { runs, runId, select, events, fresh, facts, state, refresh: () => Promise.all([loadState(), poll(true)]) };
 }

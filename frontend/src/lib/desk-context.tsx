@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { api, useDesk, useInterval } from "@/lib/api";
 
 export type Note = { id: number; ts: string; kind: string; asset: string | null; price: number | null; text: string };
-export type Headline = { title: string; link: string; source: string; category: string; ts: number };
+export type Headline = { title: string; link: string; source: string; category: string; ts: number; image?: string | null; summary?: string };
 export type UniverseAsset = {
   asset: string; asset_class: "crypto" | "gold"; source: "watchlist" | "always" | "gold" | "core" | "scan";
   score: number | null; price: number | null; change_24h: number | null; change_7d: number | null; rel_btc_7d: number | null;

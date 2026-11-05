@@ -557,7 +557,7 @@ export function ReportView() {
             ))}
           </tbody>
         </table>
-      ) : <Empty>No ideas yet. Passing is common; the report fills as the desk runs.</Empty>}
+      ) : <Empty>No ideas yet.</Empty>}
       <h3 className="border-y border-line px-3 py-2 text-[11px] font-semibold tracking-[0.08em] text-dim uppercase">Runs</h3>
       <table className="w-full text-[13px]">
         <tbody className="divide-y divide-line/60">

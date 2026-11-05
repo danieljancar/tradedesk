@@ -32,7 +32,7 @@ export default function Overview() {
         <div className="min-w-0 space-y-4">
           <section className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line lg:grid-cols-[1.5fr_repeat(4,minmax(0,1fr))]">
             <div className="col-span-2 bg-panel p-4 lg:col-span-1">
-              <p className="text-xs font-medium text-dim">Macro backdrop for crypto</p>
+              <p className="text-xs font-medium text-dim">Crypto macro</p>
               <p className={cn("font-heading text-3xl font-semibold", tone)}>{r?.label ?? "Loading"}</p>
               {r && (
                 <>
@@ -42,7 +42,7 @@ export default function Overview() {
                     <span className="bg-down" style={{ width: `${(r.headwinds / r.total) * 100}%` }} />
                   </div>
                   <p className="mt-2 text-[13px] leading-snug text-dim">
-                    {r.tailwinds} of {r.total} drivers help crypto right now, {r.headwinds} work against it. Hover or tap a card to see why.
+                    {r.tailwinds} of {r.total} drivers support crypto, {r.headwinds} weigh on it.
                   </p>
                 </>
               )}
@@ -67,7 +67,7 @@ export default function Overview() {
           </section>
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <Box title="Bitcoin against the S&P 500" right={<span className="text-xs text-dim">90 days, both start at 100</span>} pad={false}>
+            <Box title="Bitcoin against the S&P 500" right={<span className="text-xs text-dim">90 days, indexed to 100</span>} pad={false}>
               <div className="h-72 p-2"><Compare sp={drivers.find((x) => x.id === "SP500")} /></div>
             </Box>
             <Box title="Crowd mood" pad={false}><div className="h-72"><FearGreed series={m?.fear_greed ?? []} /></div></Box>
@@ -92,9 +92,9 @@ export default function Overview() {
             )}
           </Box>
 
-          <Box title="Tell the desk" right={<span className="text-xs text-dim">Read before every decision</span>}>
+          <Box title="Tell the desk" right={<span className="text-xs text-dim">Goes into every run</span>}>
             <form onSubmit={(e) => { e.preventDefault(); if (note.trim()) { d.addNote({ kind: "note", text: note }); setNote(""); } }} className="space-y-2">
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="A view, a worry, an event to respect. E.g. 'CPI on the 10th, keep size small until then'" className="min-h-20 text-sm" />
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. CPI on the 10th, keep size small" className="min-h-20 text-sm" />
               <Button size="sm" type="submit" disabled={!note.trim()}>Send to the desk</Button>
             </form>
             {d.notes.filter((n) => !n.asset).slice(0, 3).map((n) => (

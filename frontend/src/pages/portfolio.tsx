@@ -86,19 +86,19 @@ export default function Portfolio() {
           <p className="mt-1 font-mono text-3xl tabular-nums">{px(p.equity)} <span className="text-sm text-dim">{q}</span></p>
           <p className="text-xs text-dim">
             {p.equity_base != null
-              ? <>about <b className="font-mono text-fg">{px(p.equity_base)} {p.base_currency}</b> at {p.fx.rate?.toFixed(4)} ({p.fx.as_of})</>
-              : `No ${p.base_currency} value right now, the exchange rate didn't load.`}
+              ? <><b className="font-mono text-fg">{px(p.equity_base)} {p.base_currency}</b> at USD/{p.base_currency} {p.fx.rate?.toFixed(4)}, {p.fx.as_of}</>
+              : `${p.base_currency} rate unavailable`}
           </p>
         </div>
-        <Stat label="Trading sleeve" value={px(p.sleeves.active.value)} unit={q} sub={`${p.sleeves.active.share.toFixed(0)}% of the account, used for active trades`} />
+        <Stat label="Trading sleeve" value={px(p.sleeves.active.value)} unit={q} sub={`${p.sleeves.active.share.toFixed(0)}% of the account`} />
         <Stat label="Core sleeve" value={coreOn ? px(p.sleeves.core.value) : "Off"} unit={coreOn ? q : undefined}
-          sub={coreOn ? `${p.sleeves.core.share.toFixed(0)}% now, target ${p.sleeves.core.target_pct}%` : "Long-term holdings, set up in Settings"} />
-        <Stat label="Cash" value={px(cash?.value ?? 0)} unit={q} sub={`${(cash?.share ?? 0).toFixed(0)}% not invested`} className="col-span-2 lg:col-span-1" />
+          sub={coreOn ? `${p.sleeves.core.share.toFixed(0)}% of the account, target ${p.sleeves.core.target_pct}%` : "off"} />
+        <Stat label="Cash" value={px(cash?.value ?? 0)} unit={q} sub={`${(cash?.share ?? 0).toFixed(0)}% of the account`} className="col-span-2 lg:col-span-1" />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="min-w-0 space-y-4">
-          <Box title="Where the money is" right={<span className="text-xs text-dim">open positions and free cash</span>}>
+          <Box title="Allocation">
             <div className="flex h-4 overflow-hidden rounded-full bg-sunk" role="img"
               aria-label={p.allocation.by_class.map((c) => `${cls(c.class).label} ${c.share.toFixed(0)}%`).join(", ")}>
               {p.allocation.by_class.map((c) => <span key={c.class} style={{ width: `${c.share}%`, background: cls(c.class).color }} />)}
@@ -126,10 +126,10 @@ export default function Portfolio() {
             </table>
           </Box>
 
-          <Box title={<Term k="core">Core sleeve</Term>} right={coreOn && <span className="text-xs text-dim">rebalances when an asset is more than {band}% off its target</span>}>
+          <Box title={<Term k="core">Core sleeve</Term>} right={coreOn && <span className="text-xs text-dim">rebalances at {band}% drift</span>}>
             {!coreOn ? (
               <div className="space-y-2 text-sm">
-                <p>Part of the account can sit in long-term holdings, for example 60% Bitcoin and 40% gold, while the rest trades. The desk keeps each one near its target weight and puts a wide stop under every buy.</p>
+                <p>Long-term holdings, e.g. 60% BTC and 40% gold, kept at their target weights while the rest of the account trades.</p>
                 <Link to="/settings#portfolio" className="text-brand-strong underline-offset-2 hover:underline">Set the core share and targets in Settings</Link>
               </div>
             ) : (
@@ -165,16 +165,16 @@ export default function Portfolio() {
         </div>
 
         <div className="space-y-4">
-          <Box title="Rebalance waiting for you" right={(waitingPlans.length + waitingTrims.length) > 0 && <span className="rounded bg-brand px-1.5 text-[11px] font-bold text-brand-fg">{waitingPlans.length + waitingTrims.length}</span>}>
+          <Box title="Pending rebalance" right={(waitingPlans.length + waitingTrims.length) > 0 && <span className="rounded bg-brand px-1.5 text-[11px] font-bold text-brand-fg">{waitingPlans.length + waitingTrims.length}</span>}>
             {!waitingPlans.length && !waitingTrims.length && (
               <p className="text-sm text-dim">{coreOn ? "Nothing to do. The core is within its band, or the next run proposes the gaps." : "The core sleeve is off."}</p>
             )}
             <ul className="space-y-3">
               {waitingPlans.map((x) => (
                 <li key={`p${x.id}`} className="rounded-lg border border-line p-3">
-                  <p className="text-sm"><b>Buy {x.asset}</b> for about {px(x.qty * x.entry)} {q} at market</p>
+                  <p className="text-sm"><b>Buy {x.asset}</b>, {px(x.qty * x.entry)} {q} at market</p>
                   <p className="mt-1 text-xs text-dim">{x.thesis}</p>
-                  <p className="mt-1 font-mono text-xs text-dim">stop {px(x.stop)}, far target {px(x.take_profit)}</p>
+                  <p className="mt-1 font-mono text-xs text-dim">stop {px(x.stop)}, target {px(x.take_profit)}</p>
                   <div className="mt-2 flex gap-2">
                     <Button size="sm" onClick={() => act(`/api/plans/${x.id}/approve`, `Buying ${x.asset}`)}>Approve and buy</Button>
                     <Button size="sm" variant="ghost" onClick={() => act(`/api/plans/${x.id}/reject`, "Dropped")}>Drop</Button>
@@ -183,7 +183,7 @@ export default function Portfolio() {
               ))}
               {waitingTrims.map((t) => (
                 <li key={`t${t.id}`} className="rounded-lg border border-line p-3">
-                  <p className="text-sm"><b>Sell {t.asset}</b>, {px(t.qty)} for about {px(t.value)} {q}</p>
+                  <p className="text-sm"><b>Sell {t.asset}</b>, {px(t.qty)} for {px(t.value)} {q}</p>
                   <p className="mt-1 text-xs text-dim">{t.reason}</p>
                   <div className="mt-2 flex gap-2">
                     <Button size="sm" onClick={() => act(`/api/trims/${t.id}/approve`, `Selling ${t.asset}`)}>Approve and sell</Button>

@@ -122,7 +122,7 @@ export function FearGreed({ series }: { series: Point[] }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-baseline justify-between px-3 pt-2">
-        <span className="text-xs text-dim">Fear &amp; Greed, 120 days</span>
+        <span className="text-xs text-dim">Fear &amp; Greed, last 120 days</span>
         <span className="font-mono text-lg tabular-nums" style={{ color }}>{last ?? "–"}</span>
       </div>
       <ChartContainer config={{ v: { label: "Fear & Greed", color } }} className="aspect-auto min-h-0 w-full flex-1">
@@ -186,8 +186,8 @@ export function OverviewView() {
       <div className="grid min-h-[260px] flex-1 gap-px border-t border-line bg-line lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="flex min-h-[240px] flex-col bg-panel">
           <div className="flex items-baseline justify-between px-3 pt-2">
-            <span className="text-xs text-dim">Bitcoin vs S&amp;P 500, last 90 days (start = 100)</span>
-            <span className="text-[11px] text-dim">Moving together = macro is driving crypto</span>
+            <span className="text-xs text-dim">Bitcoin vs S&amp;P 500, 90 days, indexed to 100</span>
+            <span className="text-[11px] text-dim">Moving together means macro drives crypto</span>
           </div>
           <div className="min-h-0 flex-1 px-1 pb-1"><Compare sp={sp} /></div>
         </div>

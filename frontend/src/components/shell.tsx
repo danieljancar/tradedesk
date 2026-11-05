@@ -72,7 +72,7 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
             <p className="font-mono text-lg leading-tight tabular-nums">{eq == null ? "–" : px(eq)} <span className="text-xs text-dim">{d.state?.quote}</span></p>
             <p className={cn("font-mono text-[11px] tabular-nums", pnl >= 0 ? "text-up" : "text-down")}>{pnl >= 0 ? "+" : "−"}{Math.abs(pnl).toFixed(2)} since start</p>
           </div>
-          <p className="px-1 text-[11px] text-dim">{d.state?.auto_execute ? "Auto-execute on: passed plans trade without approval." : "Manual approval: you approve every trade."}</p>
+          <p className="px-1 text-[11px] text-dim">{d.state?.auto_execute ? "Auto-execute on" : "Manual approval"}</p>
         </div>
       </aside>
 

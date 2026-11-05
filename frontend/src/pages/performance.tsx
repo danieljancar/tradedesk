@@ -57,14 +57,14 @@ export default function Performance() {
     <Page>
       <section className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-4">
         <Stat label="Return" value={pc(m.total_return_pct)} tone={tone(m.total_return_pct)} sub={m.days ? `${m.days} days, since ${day(m.start!)}` : "no equity history yet"} />
-        <Stat label="Against holding BTC" value={vsBtc == null ? "n/a" : pc(vsBtc)} tone={tone(vsBtc)} sub="same money in BTC on day one" />
+        <Stat label="Against holding BTC" value={vsBtc == null ? "n/a" : pc(vsBtc)} tone={tone(vsBtc)} sub="BTC held since day one" />
         <Stat label="Worst drop" term="drawdown" value={pc(m.max_drawdown_pct)} tone="text-down" sub={`now ${pc(m.current_drawdown_pct)} from the high`} />
         <Stat label="Sharpe ratio" term="sharpe" value={num(m.sharpe)} sub={`Sortino ${num(m.sortino)}`} />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
-          <Box title="The desk against buying BTC and holding it" right={<span className="text-xs text-dim">{r.quote}, end of each day</span>} pad={false}>
+          <Box title="Desk vs. holding BTC" right={<span className="text-xs text-dim">{r.quote}, end of each day</span>} pad={false}>
             <div className="h-72 p-2">
               {series.length > 1 ? (
                 <ChartContainer config={{ desk: { label: "Desk", color: "var(--brand)" }, btc: { label: "BTC held", color: "#f7931a" } }} className="aspect-auto h-full w-full">
@@ -77,7 +77,7 @@ export default function Performance() {
                     <Line dataKey="btc" type="monotone" stroke="var(--color-btc)" strokeWidth={1.6} strokeDasharray="4 3" dot={false} connectNulls isAnimationActive={false} />
                   </LineChart>
                 </ChartContainer>
-              ) : <p className="p-4 text-sm text-dim">The curve starts once the desk has recorded equity on at least two days.</p>}
+              ) : <p className="p-4 text-sm text-dim">Needs equity from at least two days.</p>}
             </div>
             {r.benchmark_note && <p className="border-t border-line px-4 py-2 text-xs text-dim">{r.benchmark_note}</p>}
           </Box>
@@ -98,7 +98,7 @@ export default function Performance() {
           </Box>
 
           {t.by && (
-            <Box title="Closed trades, broken down">
+            <Box title="Closed trades by group">
               <div className="grid gap-6 md:grid-cols-2">
                 {BY.filter(([k]) => t.by?.[k] && Object.keys(t.by[k]).length).map(([k, label]) => (
                   <div key={k}>

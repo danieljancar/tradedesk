@@ -359,3 +359,13 @@ def analytics() -> None:
 
     d = desk()
     say(perf.summary(perf.report(d.db, d.settings, market_data(d.settings).klines)))
+
+
+@app.command()
+def gate() -> None:
+    """Exit 0 when this slot needs a full agent run, 1 when the market is quiet."""
+    from tradedesk import gate as g
+
+    why = g.reasons(desk())
+    say("; ".join(why) if why else "quiet, skipping the agent run")
+    raise typer.Exit(0 if why else 1)

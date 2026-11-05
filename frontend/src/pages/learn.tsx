@@ -59,7 +59,7 @@ export default function Learn() {
           </dl>
         </Box>
         <div className="space-y-4">
-          <Box title="What the desk has learned">
+          <Box title="Learnings">
             {stats === undefined && <p className="text-sm text-dim">Loading…</p>}
             {stats === null && (
               <p className="text-[13px] leading-relaxed text-dim">

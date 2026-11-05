@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils";
 type Cfg = { path: string; settings: any; read_only: string[]; profiles?: Record<string, Record<string, number>> };
 
 const PROFILE_TEXT: Record<string, string> = {
-  conservative: "Half a percent per trade, tight daily and total loss stops, only strong setups.",
-  balanced: "One percent per trade, up to four trades at once. The default.",
-  aggressive: "Two percent per trade, up to eight trades, lower bar for reward to risk and confidence. Losses come faster too.",
+  conservative: "0.5% per trade, tight loss stops, strong setups only.",
+  balanced: "1% per trade, up to 4 trades. Default.",
+  aggressive: "2% per trade, up to 8 trades, lower bar for R/R and confidence.",
 };
 
 function Chips({ items, onChange, placeholder }: { items: string[]; onChange: (v: string[]) => void; placeholder: string }) {
@@ -113,15 +113,15 @@ export default function Settings() {
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-panel px-4 py-3">
         <div className="text-sm">
           <span className={cn("mr-2 rounded px-1.5 py-0.5 text-[11px] font-bold uppercase", s.mode === "live" ? "bg-down/15 text-down" : "bg-brand-soft text-brand-strong")}>{s.mode}</span>
-          <span className="font-medium">{s.market === "futures" ? "Futures, long and short" : "Spot, long only"}</span>
-          <span className="ml-2 text-xs text-dim">from {cfg.path.split("/").slice(-2).join("/")}</span>
+          <span className="font-medium">{d.state?.venues?.includes("futures") && s.market === "spot" ? "Spot and futures" : s.market === "futures" ? "Futures" : "Spot"}</span>
+          <span className="ml-2 text-xs text-dim">{cfg.path.split("/").slice(-2).join("/")}</span>
         </div>
-        <p className="text-xs text-dim sm:ml-auto">Mode and market only change in the config file by hand, so going live is always deliberate.</p>
+        <p className="text-xs text-dim sm:ml-auto">Mode and markets are set in the config file.</p>
       </div>
 
       <Box title="Markets">
         <div className="space-y-4">
-          <Field label="Watchlist" hint="Coins the desk analyses and may trade. Quoted in USDT.">
+          <Field label="Watchlist" hint="Analysed every run, quoted in USDT.">
             <span />
           </Field>
           <div className="flex flex-wrap items-center gap-2">
@@ -137,7 +137,7 @@ export default function Settings() {
             </form>
           </div>
           {s.mode === "paper" && (
-            <Field label="Paper starting balance" hint="Pretend money the simulation starts with.">
+            <Field label="Paper balance at start">
               <Num value={draft.paper_equity} onChange={(v) => setDraft({ ...draft, paper_equity: v ?? 0 })} step={10} suffix="USDT" />
             </Field>
           )}
@@ -146,11 +146,11 @@ export default function Settings() {
 
       <Box title="Market scan">
         <div className="space-y-4">
-          <Toggle label="Scan the whole market every run" hint="Off: the desk only looks at the watchlist above." checked={uni.enabled} onChange={(v) => setUni("enabled", v)} />
-          <Field label="Coins the scan adds" term="scan" hint="The strongest movers by 7-day change against Bitcoin, volume surge and typical move size."><Num value={uni.top} onChange={(v) => setUni("top", v ?? 0)} step={1} /></Field>
-          <Field label="Minimum 24h volume" hint="Thin coins are skipped. In millions of USDT."><Num value={uni.min_quote_volume / 1e6} onChange={(v) => setUni("min_quote_volume", (v ?? 0) * 1e6)} step={5} suffix="M" /></Field>
-          <Field label="Most assets per run" hint="Watchlist, gold, core holdings and scan picks together. More assets cost more tokens per run."><Num value={uni.max_assets} onChange={(v) => setUni("max_assets", v ?? 1)} step={1} /></Field>
-          <Toggle label="Include gold" hint="Adds PAXG. One token is one troy ounce of gold, traded against USDT around the clock." checked={uni.include_gold} onChange={(v) => setUni("include_gold", v)} />
+          <Toggle label="Scan every run" hint="Adds the strongest movers on Binance." checked={uni.enabled} onChange={(v) => setUni("enabled", v)} />
+          <Field label="Coins the scan adds" term="scan" hint="Ranked by 7-day move against BTC, volume and ATR."><Num value={uni.top} onChange={(v) => setUni("top", v ?? 0)} step={1} /></Field>
+          <Field label="Minimum 24h volume" hint="In million USDT."><Num value={uni.min_quote_volume / 1e6} onChange={(v) => setUni("min_quote_volume", (v ?? 0) * 1e6)} step={5} suffix="M" /></Field>
+          <Field label="Most assets per run" hint="Watchlist, gold, core and scan picks combined. More assets use more tokens."><Num value={uni.max_assets} onChange={(v) => setUni("max_assets", v ?? 1)} step={1} /></Field>
+          <Toggle label="Include gold" hint="PAXG, one token per troy ounce." checked={uni.include_gold} onChange={(v) => setUni("include_gold", v)} />
           <div><p className="mb-2 text-sm font-medium">Always look at</p><Chips items={uni.always} onChange={(v) => setUni("always", v)} placeholder="e.g. BNB" /></div>
           <div><p className="mb-2 text-sm font-medium">Never pick</p><Chips items={uni.exclude} onChange={(v) => setUni("exclude", v)} placeholder="e.g. PEPE" /></div>
         </div>
@@ -162,21 +162,21 @@ export default function Settings() {
             <button key={name ?? "custom"} type="button" role="radio" aria-checked={risk.profile === name} onClick={() => pickProfile(name)}
               className={cn("min-h-11 rounded-lg border px-3 py-2.5 text-left transition-colors", risk.profile === name ? "border-brand bg-brand-soft" : "border-line hover:bg-raised")}>
               <span className="block text-sm font-semibold capitalize">{name ?? "Custom"}</span>
-              <span className="mt-0.5 block text-xs leading-snug text-dim">{name ? PROFILE_TEXT[name] : "Every limit set by hand below."}</span>
+              <span className="mt-0.5 block text-xs leading-snug text-dim">{name ? PROFILE_TEXT[name] : "All limits set manually."}</span>
             </button>
           ))}
         </div>
-        <p className="mt-3 text-xs text-dim">A profile fills in the limits below. Change any of them and your value wins. The total loss stop and the exchange stop on every trade stay on in every profile.</p>
+        <p className="mt-3 text-xs text-dim">Your own values override the profile. The loss stops and the exchange stop apply in every profile.</p>
       </Box>
 
-      <Box title="Risk per trade" right={<span className="text-xs text-dim">Right now a stopped-out trade costs about <b className="font-mono text-fg">{lossAtStop.toFixed(2)} USDT</b></span>}>
+      <Box title="Risk per trade" right={<span className="text-xs text-dim">Stopped trade costs <b className="font-mono text-fg">{lossAtStop.toFixed(2)} USDT</b></span>}>
         <div className="space-y-4">
-          <Field label="Risk on your money" term="risk" hint="Share of the account lost if a stop is hit. Max 5%."><Num value={risk.risk_per_trade_pct} onChange={(v) => setRisk("risk_per_trade_pct", v)} suffix="%" /></Field>
-          <Field label="Principal" hint="The money you put in. Leave empty to size everything from the current balance."><Num value={risk.principal} onChange={(v) => setRisk("principal", v)} step={10} suffix="USDT" /></Field>
-          <Field label="Risk on profits" hint="House money: profits above the principal can be risked at this higher rate."><Num value={risk.profit_risk_pct} onChange={(v) => setRisk("profit_risk_pct", v)} suffix="%" /></Field>
-          <Field label="Extra risk on strong conviction" term="confidence" hint="1× turns it off. At 2× a trade at the confidence below risks twice the normal amount, scaled from the minimum confidence up."><Num value={risk.confident_risk_x} onChange={(v) => setRisk("confident_risk_x", v ?? 1)} step={0.25} suffix="×" /></Field>
-          <Field label="Full conviction at" term="confidence" hint="Confidence where the extra risk reaches its top."><Num value={risk.confident_at} onChange={(v) => setRisk("confident_at", v ?? 85)} step={5} /></Field>
-          <Field label="Protected floor" hint="Share of the principal that open stops may never put at risk, even if every stop hits at once."><Num value={risk.floor_pct} onChange={(v) => setRisk("floor_pct", v)} step={5} suffix="%" /></Field>
+          <Field label="Risk on your money" term="risk" hint="Loss at the stop in % of the account. Max 5%."><Num value={risk.risk_per_trade_pct} onChange={(v) => setRisk("risk_per_trade_pct", v)} suffix="%" /></Field>
+          <Field label="Principal" hint="Money paid in. Empty means sizing from the current balance."><Num value={risk.principal} onChange={(v) => setRisk("principal", v)} step={10} suffix="USDT" /></Field>
+          <Field label="Risk on profits" hint="Risk per trade on profits above the principal."><Num value={risk.profit_risk_pct} onChange={(v) => setRisk("profit_risk_pct", v)} suffix="%" /></Field>
+          <Field label="Extra risk on strong conviction" term="confidence" hint="1× is off. At 2× a trade at full conviction risks twice the normal amount."><Num value={risk.confident_risk_x} onChange={(v) => setRisk("confident_risk_x", v ?? 1)} step={0.25} suffix="×" /></Field>
+          <Field label="Full conviction at" term="confidence"><Num value={risk.confident_at} onChange={(v) => setRisk("confident_at", v ?? 85)} step={5} /></Field>
+          <Field label="Protected floor" hint="Part of the principal that open stops can never put at risk."><Num value={risk.floor_pct} onChange={(v) => setRisk("floor_pct", v)} step={5} suffix="%" /></Field>
         </div>
       </Box>
 
@@ -186,32 +186,32 @@ export default function Settings() {
           <Field label="All open stops together" hint="Total loss if everything stops out."><Num value={risk.max_total_risk_pct} onChange={(v) => setRisk("max_total_risk_pct", v)} suffix="%" /></Field>
           <Field label="Reward to risk, minimum" term="rr"><Num value={risk.min_reward_risk} onChange={(v) => setRisk("min_reward_risk", v)} step={0.1} suffix="×" /></Field>
           <Field label="Confidence, minimum" term="confidence"><Num value={risk.min_confidence} onChange={(v) => setRisk("min_confidence", v)} step={5} /></Field>
-          <Field label="Leverage cap" term="futures" hint="Futures only. The desk uses as little as each trade needs."><Num value={risk.max_leverage} onChange={(v) => setRisk("max_leverage", v)} step={1} suffix="×" /></Field>
+          <Field label="Leverage cap" term="futures" hint="Futures only."><Num value={risk.max_leverage} onChange={(v) => setRisk("max_leverage", v)} step={1} suffix="×" /></Field>
           <Field label="Position size cap" hint="Share of the account per trade, before leverage."><Num value={risk.max_position_pct} onChange={(v) => setRisk("max_position_pct", v)} step={5} suffix="%" /></Field>
-          <Field label="Daily loss stop" hint="No new trades for the rest of the UTC day."><Num value={risk.daily_loss_limit_pct} onChange={(v) => setRisk("daily_loss_limit_pct", v)} suffix="%" /></Field>
+          <Field label="Daily loss stop" hint="No new trades until the next UTC day."><Num value={risk.daily_loss_limit_pct} onChange={(v) => setRisk("daily_loss_limit_pct", v)} suffix="%" /></Field>
           <Field label="Total loss stop" term="drawdown" hint="No new trades until the account recovers."><Num value={risk.max_drawdown_pct} onChange={(v) => setRisk("max_drawdown_pct", v)} step={5} suffix="%" /></Field>
-          <Field label="Closest stop" term="atr" hint="Stops nearer than this many ATRs are refused as noise."><Num value={risk.min_stop_atr} onChange={(v) => setRisk("min_stop_atr", v)} step={0.1} suffix="ATR" /></Field>
-          <Field label="Furthest limit entry" hint="Limit orders further from price than this are refused."><Num value={risk.max_entry_distance_pct} onChange={(v) => setRisk("max_entry_distance_pct", v)} suffix="%" /></Field>
+          <Field label="Closest stop" term="atr" hint="Closer stops are refused."><Num value={risk.min_stop_atr} onChange={(v) => setRisk("min_stop_atr", v)} step={0.1} suffix="ATR" /></Field>
+          <Field label="Furthest limit entry" hint="Limit orders further away are refused."><Num value={risk.max_entry_distance_pct} onChange={(v) => setRisk("max_entry_distance_pct", v)} suffix="%" /></Field>
         </div>
       </Box>
 
       <Box title="Trailing stops" right={<span className="text-xs text-dim">checked every 10 minutes by the sync</span>}>
         <div className="space-y-4">
-          <Toggle label="Raise stops on winning trades" hint="The stop follows the price up on a long, down on a short, and never moves back." checked={tr.enabled} onChange={(v) => setTr("enabled", v)} />
-          <Field label="Break-even after" term="r" hint="Once a trade is up this much, the stop moves to entry plus fees. The trade can't lose anymore."><Num value={tr.breakeven_r} onChange={(v) => setTr("breakeven_r", v ?? 1)} step={0.25} suffix="R" /></Field>
+          <Toggle label="Trailing stops" hint="Stops follow winning trades and never move back." checked={tr.enabled} onChange={(v) => setTr("enabled", v)} />
+          <Field label="Break-even after" term="r" hint="Stop moves to entry plus fees."><Num value={tr.breakeven_r} onChange={(v) => setTr("breakeven_r", v ?? 1)} step={0.25} suffix="R" /></Field>
           <Field label="Start trailing after" term="r"><Num value={tr.trail_start_r} onChange={(v) => setTr("trail_start_r", v ?? 1.5)} step={0.25} suffix="R" /></Field>
-          <Field label="Distance behind price" term="atr" hint="4-hour ATR for short trades, daily ATR for the rest. Closer locks more profit and stops out sooner."><Num value={tr.trail_atr} onChange={(v) => setTr("trail_atr", v ?? 2)} step={0.25} suffix="ATR" /></Field>
-          <Field label="Keep at least" hint="Share of the open gain the stop protects once trailing."><Num value={tr.lock_pct} onChange={(v) => setTr("lock_pct", v ?? 50)} step={5} suffix="%" /></Field>
+          <Field label="Distance behind price" term="atr" hint="4h ATR for short trades, daily ATR for the rest."><Num value={tr.trail_atr} onChange={(v) => setTr("trail_atr", v ?? 2)} step={0.25} suffix="ATR" /></Field>
+          <Field label="Keep at least" hint="Share of the open gain the stop keeps."><Num value={tr.lock_pct} onChange={(v) => setTr("lock_pct", v ?? 50)} step={5} suffix="%" /></Field>
         </div>
       </Box>
 
       <section id="portfolio" className="scroll-mt-4">
         <Box title={<Term k="core">Core sleeve</Term>} right={port.core_pct > 0 && targets.length > 0 && <span className={cn("text-xs", Math.abs(weightSum - 100) > 0.01 ? "text-down" : "text-dim")}>weights add up to {weightSum}%</span>}>
           <div className="space-y-4">
-            <Field label="Share of the account held long term" hint="0 turns it off. The trading sleeve sizes its trades on the rest."><Num value={port.core_pct} onChange={(v) => setPort("core_pct", v ?? 0)} step={5} suffix="%" /></Field>
+            <Field label="Core share" hint="0 is off. Trades are sized on the rest."><Num value={port.core_pct} onChange={(v) => setPort("core_pct", v ?? 0)} step={5} suffix="%" /></Field>
             <div>
               <p className="text-sm font-medium">Targets</p>
-              <p className="mb-2 text-xs text-dim">Weights inside the core, adding up to 100. For example BTC 60 and PAXG 40.</p>
+              <p className="mb-2 text-xs text-dim">Weights add up to 100, e.g. BTC 60 and PAXG 40.</p>
               <ul className="space-y-2">
                 {targets.map(([a, w], i) => (
                   <li key={i} className="flex items-center gap-2">
@@ -223,15 +223,15 @@ export default function Settings() {
               </ul>
               <Button size="sm" variant="outline" className="mt-2 h-8" onClick={() => setTargets([...targets, ["", 0]])}>Add asset</Button>
             </div>
-            <Field label="Rebalance band" term="drift" hint="Only rebalance an asset once it is this far off its own target."><Num value={port.rebalance_band_pct} onChange={(v) => setPort("rebalance_band_pct", v ?? 5)} step={1} suffix="%" /></Field>
-            <Field label="Core stop" hint="Wide stop on the exchange under every core buy, for a crash, not daily swings."><Num value={port.core_stop_pct} onChange={(v) => setPort("core_stop_pct", v ?? 35)} step={5} suffix="%" /></Field>
+            <Field label="Rebalance band" term="drift" hint="Drift from target before rebalancing."><Num value={port.rebalance_band_pct} onChange={(v) => setPort("rebalance_band_pct", v ?? 5)} step={1} suffix="%" /></Field>
+            <Field label="Core stop" hint="Exchange stop under every core buy. Binance caps it at about 20% on BTC and ETH and 10% on gold."><Num value={port.core_stop_pct} onChange={(v) => setPort("core_stop_pct", v ?? 35)} step={5} suffix="%" /></Field>
           </div>
         </Box>
       </section>
 
-      <Box title="Telegram" right={<span className={cn("text-xs", tg?.configured ? "text-up" : "text-dim")}>{tg?.configured ? "bot token and chat id found" : "no bot token in .env yet"}</span>}>
+      <Box title="Telegram" right={<span className={cn("text-xs", tg?.configured ? "text-up" : "text-dim")}>{tg?.configured ? "connected" : "not set up"}</span>}>
         <div className="space-y-4">
-          <Toggle label="Send messages to Telegram" hint="Plans with Approve and Drop buttons, fills, stops and targets, errors, run summaries. Takes effect after restarting the dashboard and the bot." checked={ntf.telegram} onChange={(v) => setNtf("telegram", v)} />
+          <Toggle label="Telegram messages" hint="Applies after restarting the dashboard and the bot." checked={ntf.telegram} onChange={(v) => setNtf("telegram", v)} />
           <div>
             <p className="mb-2 text-sm font-medium">What to send</p>
             <div className="flex flex-wrap gap-2">
@@ -244,29 +244,29 @@ export default function Settings() {
               })}
             </div>
           </div>
-          <Field label="Quiet hours" hint='Local time, e.g. "23-07". Then only errors and stop-outs come through.'>
+          <Field label="Quiet hours" hint='Local time, e.g. "23-07". Only errors and stop-outs come through.'>
             <Input value={ntf.quiet_hours} onChange={(e) => setNtf("quiet_hours", e.target.value)} placeholder="off" className="h-9 text-right font-mono" />
           </Field>
-          {!tg?.configured && <p className="rounded-md bg-sunk px-3 py-2 text-xs text-dim">Create a bot with BotFather in Telegram, put TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env, then run <code className="font-mono">uv run desk bot</code>. The README has the steps.</p>}
+          {!tg?.configured && <p className="rounded-md bg-sunk px-3 py-2 text-xs text-dim">Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env and run <code className="font-mono">uv run desk bot</code>. Steps in the README.</p>}
         </div>
       </Box>
 
       <Box title="Execution">
         <div className="space-y-4">
           <label className="flex items-center justify-between gap-4">
-            <span><span className="text-sm font-medium">Trade without asking</span><span className="block text-xs text-dim">On: every plan that passes the risk rules is sent right away. Off: plans wait for your approval on the Trades page.</span></span>
+            <span><span className="text-sm font-medium">Auto-execute</span><span className="block text-xs text-dim">Plans that pass the risk check go out without approval.</span></span>
             <Switch checked={exe.auto_execute} onCheckedChange={(v) => setExe("auto_execute", v)} />
           </label>
           <label className="flex items-center justify-between gap-4">
-            <span><span className="text-sm font-medium">Close trades that outlive their horizon</span><span className="block text-xs text-dim">Short 3 days, mid 21, long 120.</span></span>
+            <span><span className="text-sm font-medium">Close expired trades</span><span className="block text-xs text-dim">Short 3 days, mid 21, long 120.</span></span>
             <Switch checked={exe.close_expired} onCheckedChange={(v) => setExe("close_expired", v)} />
           </label>
-          <Field label="Cancel unfilled entries after" hint="Limit orders that never fill."><Num value={exe.entry_ttl_hours} onChange={(v) => setExe("entry_ttl_hours", v)} step={1} suffix="h" /></Field>
+          <Field label="Cancel unfilled entries after"><Num value={exe.entry_ttl_hours} onChange={(v) => setExe("entry_ttl_hours", v)} step={1} suffix="h" /></Field>
         </div>
       </Box>
 
       <div className="sticky bottom-16 z-10 flex items-center gap-3 rounded-xl border border-line bg-panel/95 px-4 py-3 backdrop-blur md:bottom-3">
-        <p className="text-sm text-dim">{dirty ? "Unsaved changes." : "Everything saved."}</p>
+        <p className="text-sm text-dim">{dirty ? "Unsaved changes" : "Saved"}</p>
         <Button variant="ghost" className="ml-auto" disabled={!dirty} onClick={() => setDraft(structuredClone(s))}>Discard</Button>
         <Button disabled={!dirty || saving} onClick={save}>{saving ? "Saving…" : "Save settings"}</Button>
       </div>

@@ -40,7 +40,7 @@ export default function Desk() {
         }
       >
         <Floor runId={d.runId} finished={!live} events={d.events} fresh={d.fresh} onPick={pick} />
-        <p className="mt-2 text-xs text-dim">Click anyone to see their job and everything they wrote this run. The schedule runs the desk at 01:00, 04:00 and 07:00.</p>
+        <p className="mt-2 text-xs text-dim">Click an agent to see its role and output for this run.</p>
       </Box>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -69,7 +69,7 @@ export default function Desk() {
         <div className="space-y-4">
           <Box title="Tell the desk" right={<span className="text-xs text-dim">Goes into the book they all read</span>}>
             <form onSubmit={(e) => { e.preventDefault(); if (note.trim()) { d.addNote({ kind: "note", text: note }); setNote(""); } }} className="space-y-2">
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="E.g. 'Be careful before the jobs report on Friday' or 'I like ETH shorts below 2,250'" className="min-h-20 text-sm" />
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. careful before Friday's jobs report" className="min-h-20 text-sm" />
               <div className="flex gap-2">
                 <Button size="sm" type="submit" disabled={!note.trim()}>Send</Button>
                 <Button size="sm" type="button" variant="outline" disabled={!note.trim() || live} onClick={async () => { await d.addNote({ kind: "note", text: note }); setNote(""); d.runNow(); }}>Send and run now</Button>

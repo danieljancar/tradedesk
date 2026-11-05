@@ -15,7 +15,7 @@ export function Trending() {
   useInterval(load, 600_000);
 
   return (
-    <Box title="Most searched on CoinGecko" pad={false} right={<span className="text-xs text-dim">watch only</span>}>
+    <Box title="Trending on CoinGecko" pad={false} right={<span className="text-xs text-dim">watch only</span>}>
       {error && !rows && <p className="p-4 text-sm text-down">{error}</p>}
       {!rows && !error && <div className="m-4 h-24 animate-pulse rounded-md bg-sunk" />}
       {rows && (
@@ -37,7 +37,7 @@ export function Trending() {
           ))}
         </ul>
       )}
-      <p className="border-t border-line px-4 py-2 text-xs text-dim">What people search for in the last 24 hours. The desk doesn't trade from this list.</p>
+      <p className="border-t border-line px-4 py-2 text-xs text-dim">Top searches in the last 24 hours, for information only.</p>
     </Box>
   );
 }

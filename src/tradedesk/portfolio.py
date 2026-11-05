@@ -170,8 +170,8 @@ def _buy_plan(desk: Desk, run_id: str | None, row: dict, book: risk.Book) -> dic
         take_profit=verdict.take_profit,
         confidence=100,
         thesis=(
-            f"Core rebalance: {row['asset']} is at {row['value']:.2f} against a target of "
-            f"{row['target']:.2f} ({row['weight']:g}% of the core), buying the gap."
+            f"Core rebalance: {row['asset']} at {row['value']:.2f} of a {row['target']:.2f} "
+            f"target ({row['weight']:g}% of the core)."
         ),
         invalidation=(
             f"Core stop {(1 - verdict.stop / verdict.entry) * 100 if verdict.entry else 0:.0f}% "

@@ -84,7 +84,6 @@ export function Plans({ state, refresh }: { state: DeskState | null; refresh: ()
         <Avatar id="pm" size={64} mood="idle" />
         <div>
           <p className="font-medium">No trade ideas right now.</p>
-          <p className="text-sm text-muted-foreground">Passing is a real decision. The desk only proposes a trade when the numbers line up.</p>
         </div>
       </Card>
     );
@@ -164,6 +163,7 @@ export function Talk({ events, onPick }: { events: DeskEvent[]; onPick: (id: str
 export function Account({ state, refresh }: { state: DeskState | null; refresh: () => void }) {
   if (!state) return null;
   const vals = state.equity;
+  const L = state.limits;
   const eq = vals.at(-1)?.value;
   const diff = eq != null && vals[0] ? eq - vals[0].value : 0;
   const data = vals.map((v) => ({ t: new Date(v.ts).toLocaleDateString([], { month: "short", day: "numeric" }), v: v.value }));
@@ -244,14 +244,14 @@ export function Account({ state, refresh }: { state: DeskState | null; refresh: 
       </Card>
 
       <Card className="gap-3 bg-muted/40">
-        <CardHeader><CardTitle className="text-base">House rules</CardTitle><CardDescription>Written in code. No agent can change them.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">House rules</CardTitle><CardDescription>Set in code. Agents can't change them.</CardDescription></CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm">
-            <li>A losing trade costs at most <b>1%</b> of the account (<Term k="risk">risk per trade</Term>).</li>
-            <li>Every trade needs at least <b>2×</b> more upside than downside (<Term k="rr">R/R</Term>).</li>
-            <li>The <Term k="stop">stop</Term> sits on the exchange from the first second.</li>
-            <li>Down <b>3%</b> in a day or <b>15%</b> from the top (<Term k="drawdown">drawdown</Term>): no new trades.</li>
-            <li>You approve every order.</li>
+            <li>Loss at the stop: <b>{L?.risk_per_trade_pct ?? "–"}%</b> of the account (<Term k="risk">risk per trade</Term>){(L?.confident_risk_x ?? 1) > 1 ? <>, up to <b>{(L!.risk_per_trade_pct * L!.confident_risk_x).toFixed(1)}%</b> at full conviction</> : null}.</li>
+            <li>Minimum <Term k="rr">R/R</Term>: <b>{L?.min_reward_risk ?? "–"}×</b>.</li>
+            <li>Every <Term k="stop">stop</Term> is on the exchange from the first fill.</li>
+            <li>No new trades after <b>{L?.daily_loss_limit_pct ?? "–"}%</b> down in a day or <b>{L?.max_drawdown_pct ?? "–"}%</b> from the peak (<Term k="drawdown">drawdown</Term>).</li>
+            <li>{state.auto_execute ? "Passed plans go out without approval." : "Every order needs your approval."}</li>
           </ul>
         </CardContent>
       </Card>
@@ -304,7 +304,7 @@ export function Glossary({ open, onOpenChange }: { open: boolean; onOpenChange: 
       <DialogContent className="flex max-h-[85dvh] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-heading text-2xl">Learn the words</DialogTitle>
-          <DialogDescription>Everything the desk talks about, in plain language.</DialogDescription>
+          <DialogDescription>Terms the desk uses.</DialogDescription>
         </DialogHeader>
         <Input type="search" placeholder="Search, e.g. RSI or stop" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the glossary" />
         <div className="-mr-2 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">

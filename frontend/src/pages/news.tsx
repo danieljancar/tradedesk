@@ -12,7 +12,7 @@ const MOVERS = /\b(fed|fomc|powell|rate|rates|inflation|cpi|jobs|payrolls|tariff
 
 function ago(ts: number) {
   const m = Math.max(0, Math.round((Date.now() / 1000 - ts) / 60));
-  return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
+  return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
 }
 
 function trending(items: Headline[]) {
@@ -22,6 +22,30 @@ function trending(items: Headline[]) {
     for (const w of words) count.set(w, (count.get(w) ?? 0) + 1);
   }
   return [...count].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 12);
+}
+
+const words = (t: string) => new Set(t.toLowerCase().replace(/[^a-z0-9$ ]/g, " ").split(/\s+/).filter((w) => w.length > 3));
+const similar = (a: Set<string>, b: Set<string>) => { let n = 0; a.forEach((w) => b.has(w) && n++); return n >= 2 ? n / Math.max(1, Math.min(a.size, b.size)) : 0; };
+
+// one story per event: the best-scored headline, with how many other outlets carried it
+function topStories(items: Headline[], assets: string[]) {
+  const recent = items.filter((h) => Date.now() / 1000 - h.ts < 12 * 3600);
+  const asset = new RegExp(`\\b(${[...assets, "bitcoin", "ether", "crypto"].join("|")})\\b`, "i");
+  const score = (h: Headline) => (asset.test(h.title) ? 2 : 0) + (MOVERS.test(h.title) ? 2 : 0) + (h.category === "crypto" ? 1 : 0) + (h.image ? 0.5 : 0);
+  const groups: { lead: Headline; w: Set<string>; also: Headline[]; score: number }[] = [];
+  for (const h of recent) {
+    const w = words(h.title);
+    const g = groups.find((x) => similar(x.w, w) >= 0.34);
+    if (g) { g.also.push(h); g.score += 1; if (!g.lead.image && h.image) g.lead = { ...h }; }
+    else groups.push({ lead: h, w, also: [], score: score(h) });
+  }
+  return groups.filter((g) => g.score >= 2).sort((a, b) => b.score - a.score || b.lead.ts - a.lead.ts).slice(0, 4);
+}
+
+function Thumb({ src, className }: { src?: string | null; className?: string }) {
+  const [ok, setOk] = useState(true);
+  if (!src || !ok) return null;
+  return <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setOk(false)} className={cn("shrink-0 rounded-md bg-sunk object-cover", className)} />;
 }
 
 const SOURCES: [string, [string, string][]][] = [
@@ -36,6 +60,7 @@ export default function News() {
   const [q, setQ] = useState("");
   const [onlyMovers, setOnlyMovers] = useState(false);
   const top = useMemo(() => trending(d.news), [d.news]);
+  const stories = useMemo(() => topStories(d.news, d.watch), [d.news, d.watch]);
   const shown = d.news.filter((h) =>
     (cat === "all" || h.category === cat) &&
     (!q || h.title.toLowerCase().includes(q.toLowerCase())) &&
@@ -74,6 +99,25 @@ export default function News() {
             </div>
           )}
 
+          {stories.length > 0 && !q && cat === "all" && !onlyMovers && (
+            <Box title="Top stories" right={<span className="text-xs text-dim">last 12 hours</span>} pad={false}>
+              <ul className="grid divide-y divide-line/60 lg:grid-cols-2 lg:divide-y-0">
+                {stories.map(({ lead, also }) => (
+                  <li key={lead.link} className="lg:border-line/60 lg:odd:border-r lg:[&:nth-child(n+3)]:border-t">
+                    <a href={lead.link} target="_blank" rel="noreferrer" className="group flex gap-3 p-4 hover:bg-raised/40">
+                      <Thumb src={lead.image} className="h-16 w-20 sm:h-20 sm:w-28" />
+                      <span className="min-w-0">
+                        <span className="block text-[15px] leading-snug font-medium group-hover:text-brand-strong">{lead.title}</span>
+                        {lead.summary && <span className="mt-1 line-clamp-2 block text-[13px] text-dim">{lead.summary}</span>}
+                        <span className="mt-1.5 block text-xs text-dim">{lead.source}, {ago(lead.ts)}{also.length > 0 && `, ${also.length + 1} sources`}</span>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Box>
+          )}
+
           <Box pad={false}>
             <ul className="divide-y divide-line/60">
               {shown.slice(0, 150).map((h) => {
@@ -84,13 +128,14 @@ export default function News() {
                       <span className="w-16 shrink-0 pt-0.5 text-right font-mono text-[11px] text-dim">{ago(h.ts)}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[14px] leading-snug group-hover:text-brand-strong">{h.title}</span>
+                        {h.summary && <span className="mt-0.5 line-clamp-1 block text-[13px] text-dim">{h.summary}</span>}
                         <span className="mt-1 flex items-center gap-2 text-xs text-dim">
                           {h.source}
                           <span className="rounded bg-sunk px-1.5 py-px capitalize">{h.category}</span>
                           {mover && <span className="rounded bg-warn/12 px-1.5 py-px text-warn">can move prices</span>}
                         </span>
                       </span>
-                      <ExternalLink className="mt-1 size-3.5 shrink-0 text-dim opacity-0 group-hover:opacity-100" />
+                      <Thumb src={h.image} className="hidden h-12 w-16 sm:block" />
                     </a>
                   </li>
                 );
@@ -102,7 +147,7 @@ export default function News() {
 
         <div className="space-y-4">
           <Trending />
-          <Box title="Where the numbers come from">
+          <Box title="Data sources">
             <div className="space-y-4">
               {SOURCES.map(([group, links]) => (
                 <div key={group}>
@@ -117,7 +162,7 @@ export default function News() {
             </div>
           </Box>
           <Box title="Feeds">
-            <p className="text-[13px] leading-relaxed text-dim">CoinDesk, Cointelegraph, Decrypt and The Block for crypto. CNBC, MarketWatch, the New York Times and BBC for markets. BBC, the Guardian and Al Jazeera for world news. Politico and the New York Times for politics. Refreshed every few minutes.</p>
+            <p className="text-[13px] leading-relaxed text-dim">CoinDesk, Cointelegraph, Decrypt and The Block for crypto. CNBC, MarketWatch, the New York Times and BBC for markets. BBC, the Guardian and Al Jazeera for world news. Politico and the New York Times for politics.</p>
           </Box>
         </div>
       </div>

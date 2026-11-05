@@ -27,3 +27,19 @@ def test_snapshot_is_compact_and_flags_missing_data(settings, monkeypatch):
     assert facts["BTC"]["frames"]["1d"]["rsi"] is not None
     assert facts["BTC"]["derivatives"] is None
     assert len(text.split()) < 600
+
+
+def test_headline_image_and_summary_come_from_the_feed():
+    import feedparser
+
+    from tradedesk.wire import image, summary
+
+    feed = feedparser.parse(
+        '<rss xmlns:media="http://search.yahoo.com/mrss/"><channel>'
+        '<item><title>T</title><media:content url="https://img/a.jpg" medium="image"/>'
+        "<description>&lt;p&gt;Hello &lt;b&gt;world&lt;/b&gt;&lt;/p&gt;</description></item>"
+        '<item><title>U</title><description>&lt;img src="https://img/b.png"&gt; text'
+        "</description></item></channel></rss>"
+    )
+    assert [image(e) for e in feed.entries] == ["https://img/a.jpg", "https://img/b.png"]
+    assert [summary(e) for e in feed.entries] == ["Hello world", "text"]

@@ -179,7 +179,7 @@ export default function Markets() {
             {pending != null && (
               <form className="flex flex-wrap items-center gap-2 border-b border-line bg-brand-soft px-3 py-2" onSubmit={(e) => { e.preventDefault(); saveLevel(); }}>
                 <span className="text-xs">Level at <b className="font-mono">{px(pending)}</b></span>
-                <Input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder="What is it? e.g. weekly support, breakout line" className="h-8 max-w-sm flex-1 text-sm" />
+                <Input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, e.g. weekly support" className="h-8 max-w-sm flex-1 text-sm" />
                 <Button size="sm" type="submit" className="h-8">Save for the desk</Button>
                 <Button size="sm" type="button" variant="ghost" className="h-8" onClick={() => setPending(null)}>Cancel</Button>
               </form>
@@ -235,7 +235,7 @@ export default function Markets() {
                   <button type="button" onClick={() => d.dropNote(n.id)} aria-label="Remove" className="text-dim opacity-60 hover:text-down hover:opacity-100"><Trash2 className="size-3.5" /></button>
                 </li>
               ))}
-              {!mine.length && <li className="text-xs text-dim">Use "Draw level" on the chart or add a note.</li>}
+              {!mine.length && <li className="text-xs text-dim">Use "Draw level" or add a note.</li>}
             </ul>
           </Box>
           <p className="px-1 text-[11px] text-dim">Switch coin: {d.watch.filter((a) => a !== asset).map((a) => <button key={a} className="mr-2 underline-offset-2 hover:underline" onClick={() => nav(`/markets/${a}`)}>{a}</button>)}</p>

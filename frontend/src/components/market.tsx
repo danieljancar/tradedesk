@@ -151,7 +151,7 @@ export function Market({ facts }: { facts: any }) {
   const assets = facts ? Object.keys(facts).filter((k) => !k.startsWith("_")) : [];
   if (!assets.length) return <p className="text-sm text-muted-foreground">No snapshot in this run yet.</p>;
   if (!facts[assets[0]].frames) {
-    return <p className="text-sm text-muted-foreground">This run was made before the plain-language data existed. Pick a newer run or run the desk again.</p>;
+    return <p className="text-sm text-muted-foreground">This run has no plain-language data. Pick a newer run.</p>;
   }
   return (
     <div className="space-y-4">

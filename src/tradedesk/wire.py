@@ -2,6 +2,8 @@
 Separate from news.py, which builds the agents' input and only keeps crypto and macro stories."""
 
 import calendar
+import html
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -34,6 +36,28 @@ FEEDS: dict[str, dict[str, str]] = {
 }
 
 _cache: dict[str, tuple[float, list[dict]]] = {}
+IMG = re.compile(r"<img[^>]+src=[\"']([^\"']+)", re.I)
+TAGS = re.compile(r"<[^>]+>")
+
+
+def image(entry) -> str | None:
+    """The story's picture from media tags, an enclosure or the first image in the summary."""
+    for key in ("media_content", "media_thumbnail"):
+        for m in entry.get(key) or []:
+            url = m.get("url", "")
+            if url.startswith("http") and not url.endswith(".mp4"):
+                return url
+    for link in entry.get("links") or []:
+        if link.get("rel") == "enclosure" and str(link.get("type", "")).startswith("image"):
+            return link.get("href")
+    hit = IMG.search(entry.get("summary", "") or "")
+    return hit.group(1) if hit and hit.group(1).startswith("http") else None
+
+
+def summary(entry) -> str:
+    text = html.unescape(TAGS.sub(" ", entry.get("summary", "") or ""))
+    text = " ".join(text.split())
+    return text[:240].rsplit(" ", 1)[0] + "…" if len(text) > 240 else text
 
 
 def _one(category: str, source: str, url: str) -> list[dict]:
@@ -57,6 +81,8 @@ def _one(category: str, source: str, url: str) -> list[dict]:
                 "source": source,
                 "category": category,
                 "ts": calendar.timegm(stamp),
+                "image": image(e),
+                "summary": summary(e),
             }
         )
     return out

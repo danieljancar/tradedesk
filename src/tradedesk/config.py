@@ -96,6 +96,15 @@ class Transfers(BaseModel):
     keep_free_pct: float = Field(10.0, ge=0, le=50)
 
 
+class Gate(BaseModel):
+    """Skips the hourly agent run when the market is quiet. The sync still runs every time."""
+
+    enabled: bool = False
+    move_atr: float = Field(1.0, gt=0)
+    max_gap_hours: float = Field(4.0, gt=0)
+    headlines: int = Field(2, ge=1)
+
+
 class Universe(BaseModel):
     enabled: bool = True
     min_quote_volume: float = Field(20_000_000, ge=0)
@@ -190,6 +199,7 @@ class Settings(BaseModel):
     # a second config for the futures wallet; one run then trades both
     futures_desk: Path | None = None
     transfers: Transfers = Transfers()
+    gate: Gate = Gate()
     # the other dashboard (live or the paper lab), linked from the header
     peer_dashboard: str = ""
 
