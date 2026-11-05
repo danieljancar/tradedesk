@@ -225,7 +225,7 @@ export default function Markets() {
           </Box>
           <Box title="My levels and notes" right={<span className="text-xs text-dim">The desk reads these</span>}>
             <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); if (note.trim()) { d.addNote({ kind: "idea", asset, text: note }); setNote(""); } }}>
-              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={`Your view on ${asset}, e.g. "I'd short a rejection at 80k"`} className="min-h-16 text-sm" />
+              <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={`Note on ${asset}`} className="min-h-16 text-sm" />
               <Button size="sm" type="submit" disabled={!note.trim()}>Add note</Button>
             </form>
             <ul className="mt-3 space-y-1.5">

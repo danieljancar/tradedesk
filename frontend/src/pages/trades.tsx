@@ -126,7 +126,7 @@ export default function Trades() {
                   })}
                 </tbody>
               </table>
-              <p className="border-t border-line px-4 py-2 text-xs text-dim">Stops only move in the trade's favor and stay on Binance while this Mac is off.</p>
+              <p className="border-t border-line px-4 py-2 text-xs text-dim">Stops stay on Binance while this Mac is off.</p>
             </div>
           ) : <p className="p-8 text-center text-sm text-dim">No open positions.</p>}
         </Box>
@@ -157,7 +157,7 @@ export default function Trades() {
       )}
 
       {tab === "Replay" && (
-        <Box title="Idea replay on 1h candles" right={<span className="text-xs text-dim">Taken or not, what would have happened</span>} pad={false}>
+        <Box title="Idea replay on 1h candles" pad={false}>
           <div className="relative h-[70vh]"><ReportView /></div>
         </Box>
       )}

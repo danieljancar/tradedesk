@@ -40,7 +40,6 @@ export default function Desk() {
         }
       >
         <Floor runId={d.runId} finished={!live} events={d.events} fresh={d.fresh} onPick={pick} />
-        <p className="mt-2 text-xs text-dim">Click an agent to see its role and output for this run.</p>
       </Box>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -67,7 +66,7 @@ export default function Desk() {
         </section>
 
         <div className="space-y-4">
-          <Box title="Tell the desk" right={<span className="text-xs text-dim">Goes into the book they all read</span>}>
+          <Box title="Tell the desk">
             <form onSubmit={(e) => { e.preventDefault(); if (note.trim()) { d.addNote({ kind: "note", text: note }); setNote(""); } }} className="space-y-2">
               <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. careful before Friday's jobs report" className="min-h-20 text-sm" />
               <div className="flex gap-2">

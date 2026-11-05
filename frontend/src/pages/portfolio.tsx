@@ -129,8 +129,7 @@ export default function Portfolio() {
           <Box title={<Term k="core">Core sleeve</Term>} right={coreOn && <span className="text-xs text-dim">rebalances at {band}% drift</span>}>
             {!coreOn ? (
               <div className="space-y-2 text-sm">
-                <p>Long-term holdings, e.g. 60% BTC and 40% gold, kept at their target weights while the rest of the account trades.</p>
-                <Link to="/settings#portfolio" className="text-brand-strong underline-offset-2 hover:underline">Set the core share and targets in Settings</Link>
+                                <Link to="/settings#portfolio" className="text-brand-strong underline-offset-2 hover:underline">Set the core share and targets in Settings</Link>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -167,7 +166,7 @@ export default function Portfolio() {
         <div className="space-y-4">
           <Box title="Pending rebalance" right={(waitingPlans.length + waitingTrims.length) > 0 && <span className="rounded bg-brand px-1.5 text-[11px] font-bold text-brand-fg">{waitingPlans.length + waitingTrims.length}</span>}>
             {!waitingPlans.length && !waitingTrims.length && (
-              <p className="text-sm text-dim">{coreOn ? "Nothing to do. The core is within its band, or the next run proposes the gaps." : "The core sleeve is off."}</p>
+              <p className="text-sm text-dim">{coreOn ? "Nothing pending." : "The core sleeve is off."}</p>
             )}
             <ul className="space-y-3">
               {waitingPlans.map((x) => (

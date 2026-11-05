@@ -11,9 +11,9 @@ import { pc, px, readAsset, readMood } from "@/lib/learn";
 import { cn } from "@/lib/utils";
 
 const TF_HELP: Record<string, string> = {
-  "4h": "Each candle is 4 hours. Shows the next few days.",
-  "1d": "Each candle is one day. Shows the next few weeks.",
-  "1w": "Each candle is one week. The big picture, months.",
+  "4h": "4-hour candles",
+  "1d": "Daily candles",
+  "1w": "Weekly candles",
 };
 
 function Dir({ dir }: { dir: string }) {
@@ -114,7 +114,7 @@ function AssetCard({ asset, f }: { asset: string; f: any }) {
             <span className="text-muted-foreground">where price sits between them</span>
             <span><b className="tabular-nums">{px(hi)}</b> <Term k="resistance">ceiling</Term></span>
           </div>
-          <div className="relative h-2 rounded-full bg-gradient-to-r from-up/60 via-muted-foreground/25 to-down/60" role="img" aria-label={`${Math.round(k * 100)}% of the way from floor to ceiling`}>
+          <div className="relative h-2 rounded-full bg-gradient-to-r from-up/60 via-muted-foreground/25 to-down/60" role="img" aria-label={`${Math.round(k * 100)}% of the range`}>
             <span className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-foreground shadow" style={{ left: `${k * 100}%` }} />
           </div>
         </div>

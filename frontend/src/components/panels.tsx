@@ -207,7 +207,7 @@ export function Account({ state, refresh }: { state: DeskState | null; refresh: 
       <Card className="gap-3">
         <CardHeader><CardTitle className="text-base">Open trades</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {!state.positions.length && <p className="text-sm text-muted-foreground">None. The account is all in cash.</p>}
+          {!state.positions.length && <p className="text-sm text-muted-foreground">No open positions.</p>}
           {state.positions.map((p) => {
             const sign = p.side === "long" ? 1 : -1;
             const pnl = p.price == null ? 0 : (p.price - p.entry_price) * p.qty * sign;
@@ -244,7 +244,7 @@ export function Account({ state, refresh }: { state: DeskState | null; refresh: 
       </Card>
 
       <Card className="gap-3 bg-muted/40">
-        <CardHeader><CardTitle className="text-base">House rules</CardTitle><CardDescription>Set in code. Agents can't change them.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">House rules</CardTitle></CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm">
             <li>Loss at the stop: <b>{L?.risk_per_trade_pct ?? "–"}%</b> of the account (<Term k="risk">risk per trade</Term>){(L?.confident_risk_x ?? 1) > 1 ? <>, up to <b>{(L!.risk_per_trade_pct * L!.confident_risk_x).toFixed(1)}%</b> at full conviction</> : null}.</li>
@@ -278,7 +278,7 @@ export function AgentSheet({ id, events, onClose }: { id: string | null; events:
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <div className="space-y-4 p-4">
                 <p className="rounded-lg bg-muted/60 p-3 text-sm leading-relaxed">{ABOUT[id]}</p>
-                {!items.length && <p className="text-sm text-muted-foreground">Nothing from them in this run yet.</p>}
+                {!items.length && <p className="text-sm text-muted-foreground">No output this run.</p>}
                 {items.map((e) => (
                   <article key={e.id} className="rounded-xl border p-4">
                     <header className="mb-2 flex items-baseline justify-between gap-2"><b>{e.title}</b><time className="text-xs text-muted-foreground">{clock(e.ts)}</time></header>
@@ -316,7 +316,7 @@ export function Glossary({ open, onOpenChange }: { open: boolean; onOpenChange: 
                 {g.long && <dd className="text-sm text-muted-foreground">{g.long}</dd>}
               </div>
             ))}
-            {!shown.length && <p className="py-6 text-sm text-muted-foreground">Nothing matches. Try a shorter word.</p>}
+            {!shown.length && <p className="py-6 text-sm text-muted-foreground">No matches.</p>}
           </dl>
         </div>
       </DialogContent>

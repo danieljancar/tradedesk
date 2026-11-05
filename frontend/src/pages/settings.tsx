@@ -36,10 +36,10 @@ function Chips({ items, onChange, placeholder }: { items: string[]; onChange: (v
   );
 }
 
-function Toggle({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center justify-between gap-4">
-      <span><span className="text-sm font-medium">{label}</span><span className="block text-xs text-dim">{hint}</span></span>
+      <span><span className="text-sm font-medium">{label}</span>{hint && <span className="block text-xs text-dim">{hint}</span>}</span>
       <Switch checked={checked} onCheckedChange={onChange} />
     </label>
   );
@@ -146,11 +146,11 @@ export default function Settings() {
 
       <Box title="Market scan">
         <div className="space-y-4">
-          <Toggle label="Scan every run" hint="Adds the strongest movers on Binance." checked={uni.enabled} onChange={(v) => setUni("enabled", v)} />
+          <Toggle label="Scan every run" checked={uni.enabled} onChange={(v) => setUni("enabled", v)} />
           <Field label="Coins the scan adds" term="scan" hint="Ranked by 7-day move against BTC, volume and ATR."><Num value={uni.top} onChange={(v) => setUni("top", v ?? 0)} step={1} /></Field>
-          <Field label="Minimum 24h volume" hint="In million USDT."><Num value={uni.min_quote_volume / 1e6} onChange={(v) => setUni("min_quote_volume", (v ?? 0) * 1e6)} step={5} suffix="M" /></Field>
-          <Field label="Most assets per run" hint="Watchlist, gold, core and scan picks combined. More assets use more tokens."><Num value={uni.max_assets} onChange={(v) => setUni("max_assets", v ?? 1)} step={1} /></Field>
-          <Toggle label="Include gold" hint="PAXG, one token per troy ounce." checked={uni.include_gold} onChange={(v) => setUni("include_gold", v)} />
+          <Field label="Minimum 24h volume"><Num value={uni.min_quote_volume / 1e6} onChange={(v) => setUni("min_quote_volume", (v ?? 0) * 1e6)} step={5} suffix="M" /></Field>
+          <Field label="Most assets per run" hint="More assets use more tokens."><Num value={uni.max_assets} onChange={(v) => setUni("max_assets", v ?? 1)} step={1} /></Field>
+          <Toggle label="Include gold" hint="PAXG" checked={uni.include_gold} onChange={(v) => setUni("include_gold", v)} />
           <div><p className="mb-2 text-sm font-medium">Always look at</p><Chips items={uni.always} onChange={(v) => setUni("always", v)} placeholder="e.g. BNB" /></div>
           <div><p className="mb-2 text-sm font-medium">Never pick</p><Chips items={uni.exclude} onChange={(v) => setUni("exclude", v)} placeholder="e.g. PEPE" /></div>
         </div>
@@ -166,7 +166,6 @@ export default function Settings() {
             </button>
           ))}
         </div>
-        <p className="mt-3 text-xs text-dim">Your own values override the profile. The loss stops and the exchange stop apply in every profile.</p>
       </Box>
 
       <Box title="Risk per trade" right={<span className="text-xs text-dim">Stopped trade costs <b className="font-mono text-fg">{lossAtStop.toFixed(2)} USDT</b></span>}>
@@ -183,32 +182,32 @@ export default function Settings() {
       <Box title="Limits">
         <div className="grid gap-4 lg:grid-cols-2 lg:gap-x-10">
           <Field label="Open trades at once" hint="Positions plus waiting entries."><Num value={risk.max_open_positions} onChange={(v) => setRisk("max_open_positions", v)} step={1} /></Field>
-          <Field label="All open stops together" hint="Total loss if everything stops out."><Num value={risk.max_total_risk_pct} onChange={(v) => setRisk("max_total_risk_pct", v)} suffix="%" /></Field>
+          <Field label="All open stops together"><Num value={risk.max_total_risk_pct} onChange={(v) => setRisk("max_total_risk_pct", v)} suffix="%" /></Field>
           <Field label="Reward to risk, minimum" term="rr"><Num value={risk.min_reward_risk} onChange={(v) => setRisk("min_reward_risk", v)} step={0.1} suffix="×" /></Field>
           <Field label="Confidence, minimum" term="confidence"><Num value={risk.min_confidence} onChange={(v) => setRisk("min_confidence", v)} step={5} /></Field>
           <Field label="Leverage cap" term="futures" hint="Futures only."><Num value={risk.max_leverage} onChange={(v) => setRisk("max_leverage", v)} step={1} suffix="×" /></Field>
-          <Field label="Position size cap" hint="Share of the account per trade, before leverage."><Num value={risk.max_position_pct} onChange={(v) => setRisk("max_position_pct", v)} step={5} suffix="%" /></Field>
+          <Field label="Position size cap" hint="Before leverage."><Num value={risk.max_position_pct} onChange={(v) => setRisk("max_position_pct", v)} step={5} suffix="%" /></Field>
           <Field label="Daily loss stop" hint="No new trades until the next UTC day."><Num value={risk.daily_loss_limit_pct} onChange={(v) => setRisk("daily_loss_limit_pct", v)} suffix="%" /></Field>
           <Field label="Total loss stop" term="drawdown" hint="No new trades until the account recovers."><Num value={risk.max_drawdown_pct} onChange={(v) => setRisk("max_drawdown_pct", v)} step={5} suffix="%" /></Field>
-          <Field label="Closest stop" term="atr" hint="Closer stops are refused."><Num value={risk.min_stop_atr} onChange={(v) => setRisk("min_stop_atr", v)} step={0.1} suffix="ATR" /></Field>
-          <Field label="Furthest limit entry" hint="Limit orders further away are refused."><Num value={risk.max_entry_distance_pct} onChange={(v) => setRisk("max_entry_distance_pct", v)} suffix="%" /></Field>
+          <Field label="Closest stop" term="atr"><Num value={risk.min_stop_atr} onChange={(v) => setRisk("min_stop_atr", v)} step={0.1} suffix="ATR" /></Field>
+          <Field label="Furthest limit entry"><Num value={risk.max_entry_distance_pct} onChange={(v) => setRisk("max_entry_distance_pct", v)} suffix="%" /></Field>
         </div>
       </Box>
 
-      <Box title="Trailing stops" right={<span className="text-xs text-dim">checked every 10 minutes by the sync</span>}>
+      <Box title="Trailing stops" right={<span className="text-xs text-dim">every 10 min</span>}>
         <div className="space-y-4">
-          <Toggle label="Trailing stops" hint="Stops follow winning trades and never move back." checked={tr.enabled} onChange={(v) => setTr("enabled", v)} />
+          <Toggle label="Trailing stops" checked={tr.enabled} onChange={(v) => setTr("enabled", v)} />
           <Field label="Break-even after" term="r" hint="Stop moves to entry plus fees."><Num value={tr.breakeven_r} onChange={(v) => setTr("breakeven_r", v ?? 1)} step={0.25} suffix="R" /></Field>
           <Field label="Start trailing after" term="r"><Num value={tr.trail_start_r} onChange={(v) => setTr("trail_start_r", v ?? 1.5)} step={0.25} suffix="R" /></Field>
           <Field label="Distance behind price" term="atr" hint="4h ATR for short trades, daily ATR for the rest."><Num value={tr.trail_atr} onChange={(v) => setTr("trail_atr", v ?? 2)} step={0.25} suffix="ATR" /></Field>
-          <Field label="Keep at least" hint="Share of the open gain the stop keeps."><Num value={tr.lock_pct} onChange={(v) => setTr("lock_pct", v ?? 50)} step={5} suffix="%" /></Field>
+          <Field label="Keep at least"><Num value={tr.lock_pct} onChange={(v) => setTr("lock_pct", v ?? 50)} step={5} suffix="%" /></Field>
         </div>
       </Box>
 
       <section id="portfolio" className="scroll-mt-4">
         <Box title={<Term k="core">Core sleeve</Term>} right={port.core_pct > 0 && targets.length > 0 && <span className={cn("text-xs", Math.abs(weightSum - 100) > 0.01 ? "text-down" : "text-dim")}>weights add up to {weightSum}%</span>}>
           <div className="space-y-4">
-            <Field label="Core share" hint="0 is off. Trades are sized on the rest."><Num value={port.core_pct} onChange={(v) => setPort("core_pct", v ?? 0)} step={5} suffix="%" /></Field>
+            <Field label="Core share" hint="0 is off."><Num value={port.core_pct} onChange={(v) => setPort("core_pct", v ?? 0)} step={5} suffix="%" /></Field>
             <div>
               <p className="text-sm font-medium">Targets</p>
               <p className="mb-2 text-xs text-dim">Weights add up to 100, e.g. BTC 60 and PAXG 40.</p>
@@ -223,8 +222,8 @@ export default function Settings() {
               </ul>
               <Button size="sm" variant="outline" className="mt-2 h-8" onClick={() => setTargets([...targets, ["", 0]])}>Add asset</Button>
             </div>
-            <Field label="Rebalance band" term="drift" hint="Drift from target before rebalancing."><Num value={port.rebalance_band_pct} onChange={(v) => setPort("rebalance_band_pct", v ?? 5)} step={1} suffix="%" /></Field>
-            <Field label="Core stop" hint="Exchange stop under every core buy. Binance caps it at about 20% on BTC and ETH and 10% on gold."><Num value={port.core_stop_pct} onChange={(v) => setPort("core_stop_pct", v ?? 35)} step={5} suffix="%" /></Field>
+            <Field label="Rebalance band" term="drift"><Num value={port.rebalance_band_pct} onChange={(v) => setPort("rebalance_band_pct", v ?? 5)} step={1} suffix="%" /></Field>
+            <Field label="Core stop" hint="Capped by Binance at about 20% on BTC and ETH, 10% on gold."><Num value={port.core_stop_pct} onChange={(v) => setPort("core_stop_pct", v ?? 35)} step={5} suffix="%" /></Field>
           </div>
         </Box>
       </section>
@@ -254,7 +253,7 @@ export default function Settings() {
       <Box title="Execution">
         <div className="space-y-4">
           <label className="flex items-center justify-between gap-4">
-            <span><span className="text-sm font-medium">Auto-execute</span><span className="block text-xs text-dim">Plans that pass the risk check go out without approval.</span></span>
+            <span><span className="text-sm font-medium">Auto-execute</span></span>
             <Switch checked={exe.auto_execute} onCheckedChange={(v) => setExe("auto_execute", v)} />
           </label>
           <label className="flex items-center justify-between gap-4">

@@ -37,7 +37,6 @@ export function Trending() {
           ))}
         </ul>
       )}
-      <p className="border-t border-line px-4 py-2 text-xs text-dim">Top searches in the last 24 hours, for information only.</p>
     </Box>
   );
 }

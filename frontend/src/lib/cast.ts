@@ -19,17 +19,17 @@ const CAST_DEF = {
 export const CAST: Record<string, any> = CAST_DEF;
 
 export const ABOUT: Record<string, string> = {
-  scanner: "A data feed. Goes through every coin on Binance with enough volume and picks the few that moved most against Bitcoin or traded far above their usual volume. Those join your watchlist and gold for the day.",
-  prices: "Not a character, a data feed. Pulls 4-hour, daily and weekly candles from Binance and turns them into averages, momentum, typical move size and key price levels.",
-  headlines: "A data feed. Collects the last 36 hours of crypto headlines and sorts them by coin.",
-  book: "The account's notebook: money available, open trades, recent results, and lessons the desk wrote after past trades.",
-  technical: "Reads only the numbers from the Prices feed. Says which way each chart leans and where the important levels are. Never looks at news.",
-  news: "Reads the headlines and checks the economic calendar with at most three web searches. Reports facts and dates, no trade ideas.",
-  bull: "Reads both analysts and makes the best case for buying. If there isn't one, it has to say so.",
-  bear: "Reads both analysts and makes the best case for staying out or selling. Looks hardest at crowding and upcoming events.",
-  pm: "Weighs the bull against the bear and writes the trade plan: entry, stop, target, confidence. Never chooses the size.",
-  risk: "Not AI. Plain Python rules decide the size so a loss costs 1% of the account, and throw out any plan that breaks a rule.",
-  exchange: "Sends only the plans you approved to Binance, always with the stop already attached on the exchange.",
+  scanner: "Data feed. Ranks liquid Binance coins by move against BTC and volume. The top picks join the watchlist for the run.",
+  prices: "Data feed. 4h, daily and weekly candles from Binance, turned into averages, momentum, ATR and levels.",
+  headlines: "Data feed. Crypto headlines from the last 36 hours, sorted by coin.",
+  book: "Balance, open trades, recent results and lessons from past reviews.",
+  technical: "Reads only the price data. Trend and key levels per coin, no news.",
+  news: "Reads the headlines and checks the economic calendar with up to three web searches. Facts and dates, no trade ideas.",
+  bull: "Makes the best case for buying, or says there is none.",
+  bear: "Makes the best case against: crowding, upcoming events, reasons to sell.",
+  pm: "Weighs bull against bear and writes the plan: entry, stop, target, confidence. The risk engine sets the size.",
+  risk: "Python rules, no AI. Sizes every plan from the risk limits and rejects any plan that breaks one.",
+  exchange: "Sends approved plans to Binance with the stop attached.",
 };
 
 const BEAN = "M0 -44 C27 -44 41 -24 41 4 C41 33 24 48 0 48 C-24 48 -41 33 -41 4 C-41 -24 -27 -44 0 -44 Z";

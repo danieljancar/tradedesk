@@ -161,9 +161,6 @@ export default function News() {
               ))}
             </div>
           </Box>
-          <Box title="Feeds">
-            <p className="text-[13px] leading-relaxed text-dim">CoinDesk, Cointelegraph, Decrypt and The Block for crypto. CNBC, MarketWatch, the New York Times and BBC for markets. BBC, the Guardian and Al Jazeera for world news. Politico and the New York Times for politics.</p>
-          </Box>
         </div>
       </div>
     </Page>

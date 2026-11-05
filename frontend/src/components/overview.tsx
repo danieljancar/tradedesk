@@ -187,7 +187,6 @@ export function OverviewView() {
         <div className="flex min-h-[240px] flex-col bg-panel">
           <div className="flex items-baseline justify-between px-3 pt-2">
             <span className="text-xs text-dim">Bitcoin vs S&amp;P 500, 90 days, indexed to 100</span>
-            <span className="text-[11px] text-dim">Moving together means macro drives crypto</span>
           </div>
           <div className="min-h-0 flex-1 px-1 pb-1"><Compare sp={sp} /></div>
         </div>
