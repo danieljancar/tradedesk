@@ -79,7 +79,18 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-panel px-3 sm:px-4">
           <div className="flex items-center gap-2 md:hidden"><Avatar id="bull" size={26} mood="awake" /></div>
-          <h1 className="font-heading text-lg font-semibold tracking-tight">{title}</h1>
+          <h1 className="min-w-0 truncate font-heading text-lg font-semibold tracking-tight">{title}</h1>
+          {d.state?.peer && (
+            <div className="ml-1 flex shrink-0 rounded-md bg-sunk p-0.5 text-xs font-medium" role="group" aria-label="Desk">
+              {(["live", "paper"] as const).map((m) => {
+                const here = (d.state!.mode === "live") === (m === "live");
+                const label = m === "live" ? "Live" : "Lab";
+                return here
+                  ? <span key={m} aria-current="page" className={cn("rounded-[5px] px-2.5 py-1 shadow-sm", m === "live" ? "bg-up/15 text-up" : "bg-raised text-fg")}>{label}</span>
+                  : <a key={m} href={d.state!.peer! + location.pathname} className="rounded-[5px] px-2.5 py-1 text-dim hover:text-fg">{label}</a>;
+              })}
+            </div>
+          )}
           {regime && (
             <NavLink to="/" className={cn("ml-2 hidden items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium sm:flex",
               regime.label === "Risk-on" ? "bg-up/12 text-up" : regime.label === "Risk-off" ? "bg-down/12 text-down" : "bg-warn/12 text-warn")}>

@@ -195,3 +195,11 @@ def test_conviction_still_bounded_by_total_risk(settings):
     settings.risk.max_total_risk_pct = 2
     v = check(idea(confidence=95), settings, book(), price=100.5, atr=4, rules=RULES)
     assert v.risk_amount <= 20 + 1e-6
+
+
+def test_spot_exit_outside_the_price_band_is_refused(settings):
+    from tradedesk.binance.market import SymbolRules
+
+    tight = SymbolRules(tick=0.01, step=0.0001, min_qty=0.0001, min_notional=5, sell_down=0.97)
+    v = check(idea(), settings, book(), price=100.5, atr=4, rules=tight)
+    assert any("lowest sell price" in r for r in v.reasons)

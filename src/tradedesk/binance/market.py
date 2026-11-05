@@ -13,6 +13,15 @@ class SymbolRules:
     step: float
     min_qty: float
     min_notional: float
+    # sell orders must sit between these multiples of the 5-minute average price, 0 if unknown
+    sell_up: float = 0.0
+    sell_down: float = 0.0
+
+    def exit_band(self, price: float) -> tuple[float, float]:
+        """Lowest stop and highest target the exchange accepts around price, with a margin."""
+        low = self.price(price * self.sell_down * 1.01) if self.sell_down else 0.0
+        high = self.price(price * self.sell_up * 0.99) if self.sell_up else float("inf")
+        return low, high
 
     def price(self, value: float) -> float:
         return round_to(value, self.tick)
@@ -126,9 +135,13 @@ class MarketData:
         lot = filters.get("MARKET_LOT_SIZE") or filters["LOT_SIZE"]
         notional = filters.get("NOTIONAL") or filters.get("MIN_NOTIONAL") or {}
         min_notional = notional.get("minNotional") or notional.get("notional") or 0
+        # spot checks a sell's price, and an OCO's stop, against the average price
+        band = filters.get("PERCENT_PRICE_BY_SIDE", {}) if self.market is Market.SPOT else {}
         return SymbolRules(
             tick=float(filters["PRICE_FILTER"]["tickSize"]),
             step=max(float(filters["LOT_SIZE"]["stepSize"]), float(lot["stepSize"])),
             min_qty=float(filters["LOT_SIZE"]["minQty"]),
             min_notional=float(min_notional),
+            sell_up=float(band.get("askMultiplierUp", 0)),
+            sell_down=float(band.get("askMultiplierDown", 0)),
         )

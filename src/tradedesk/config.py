@@ -190,6 +190,8 @@ class Settings(BaseModel):
     # a second config for the futures wallet; one run then trades both
     futures_desk: Path | None = None
     transfers: Transfers = Transfers()
+    # the other dashboard (live or the paper lab), linked from the header
+    peer_dashboard: str = ""
 
     @model_validator(mode="after")
     def core_not_quote(self) -> "Settings":

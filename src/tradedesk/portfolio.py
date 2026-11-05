@@ -68,7 +68,7 @@ def rebalance(
         }
         if target and drift_pct < -p.rebalance_band_pct:
             qty = r.qty(-drift / price)
-            stop = r.price(price * (1 - p.core_stop_pct / 100))
+            stop = max(r.price(price * (1 - p.core_stop_pct / 100)), r.exit_band(price)[0])
             exit_qty = r.qty(qty * (1 - risk.SPOT_FEE_BUFFER))
             if exit_qty < r.min_qty or exit_qty * stop < r.min_notional:
                 row["note"] = f"gap of {-drift:.2f} is below the exchange minimum"
@@ -104,8 +104,9 @@ def size_buy(settings: Settings, book: risk.Book, row: dict, rules: SymbolRules)
         reasons.append("the core sleeve needs market = spot, futures net every symbol")
     reasons += risk.account_blocks(settings, book)
     price = row["price"]
-    stop = rules.price(price * (1 - settings.portfolio.core_stop_pct / 100))
-    take_profit = rules.price(price * TARGET_MULT)
+    low, high = rules.exit_band(price)
+    stop = max(rules.price(price * (1 - settings.portfolio.core_stop_pct / 100)), low)
+    take_profit = min(rules.price(price * TARGET_MULT), high)
     qty = rules.qty(min(row["qty"], max(0.0, book.free_quote) * 0.995 / price))
     exit_qty = rules.qty(qty * (1 - risk.SPOT_FEE_BUFFER))
     if exit_qty < rules.min_qty or exit_qty * stop < rules.min_notional:
@@ -173,7 +174,8 @@ def _buy_plan(desk: Desk, run_id: str | None, row: dict, book: risk.Book) -> dic
             f"{row['target']:.2f} ({row['weight']:g}% of the core), buying the gap."
         ),
         invalidation=(
-            f"Wide core stop {s.portfolio.core_stop_pct:g}% under entry, the weights change, "
+            f"Core stop {(1 - verdict.stop / verdict.entry) * 100 if verdict.entry else 0:.0f}% "
+            "under entry, the weights change, "
             "or the core is switched off."
         ),
         status=status,

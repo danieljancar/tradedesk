@@ -200,6 +200,7 @@ def create_app(desk: Desk) -> FastAPI:
             "mode": desk.settings.mode,
             "market": desk.settings.market,
             "venues": [d.settings.market.value for d, _ in desks],
+            "peer": desk.settings.peer_dashboard or None,
             "quote": desk.settings.quote,
             "limits": desk.settings.risk.model_dump(),
             "watchlist": desk.settings.watchlist,

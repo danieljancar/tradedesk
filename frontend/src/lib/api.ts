@@ -7,6 +7,7 @@ export type Position = Record<string, any> & { id: string; venue?: string; asset
 export type DeskState = {
   mode: string; market: string; quote: string; auto_execute?: boolean; watchlist?: string[];
   telegram?: { enabled: boolean; configured: boolean };
+  peer?: string | null; venues?: string[];
   limits?: { risk_per_trade_pct: number; max_open_positions: number; daily_loss_limit_pct: number; max_leverage: number } & Record<string, number>;
   equity: { ts: string; value: number }[];
   positions: Position[]; plans: Plan[]; closed: Position[];

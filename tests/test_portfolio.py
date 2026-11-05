@@ -233,3 +233,21 @@ PLAN = dict(
     created_at="2026-10-01T00:00:00",
     updated_at="2026-10-01T00:00:00",
 )
+
+
+def test_core_buy_stays_inside_the_exchange_price_band(settings):
+    from tradedesk.binance.market import SymbolRules
+    from tradedesk.portfolio import size_buy
+    from tradedesk.risk import Book
+
+    settings.portfolio.core_pct = 30
+    settings.portfolio.core_targets = {"PAXG": 100}
+    rules = SymbolRules(
+        tick=0.01, step=0.0001, min_qty=0.0001, min_notional=5, sell_up=1.2, sell_down=0.9
+    )
+    book = Book(
+        equity=1000, free_quote=1000, peak_equity=1000, day_pnl=0, open_risk=0, open_count=0
+    )
+    v = size_buy(settings, book, {"price": 100.0, "qty": 1.0}, rules)
+    assert v.stop == pytest.approx(90.9)
+    assert v.take_profit == pytest.approx(118.8)

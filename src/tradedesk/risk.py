@@ -112,6 +112,17 @@ def check(
         )
     if (stop - price) * s >= 0:
         reasons.append("stop is already through the current price")
+    if settings.market is Market.SPOT:
+        low, high = rules.exit_band(price)
+        if stop < low:
+            reasons.append(
+                f"stop {stop:g} is below {low:g}, the lowest sell price Binance accepts right now"
+            )
+        if take_profit > high:
+            reasons.append(
+                f"target {take_profit:g} is above {high:g}, the highest sell price Binance "
+                "accepts right now"
+            )
 
     stop_dist = abs(entry - stop)
     stop_pct = stop_dist / entry * 100
