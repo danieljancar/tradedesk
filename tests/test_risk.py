@@ -90,8 +90,14 @@ def test_daily_loss_blocks_everything(settings):
 
 
 def test_total_risk_cap(settings):
-    v = check(idea(), settings, book(open_risk=35), price=100.5, atr=4, rules=RULES)
+    v = check(idea(), settings, book(open_risk=36), price=100.5, atr=4, rules=RULES)
     assert any("open risk" in r for r in v.reasons)
+
+
+def test_total_risk_cap_shrinks_a_trade_that_still_fits_half(settings):
+    v = check(idea(), settings, book(open_risk=32), price=100.5, atr=4, rules=RULES)
+    assert v.ok
+    assert v.risk_amount == pytest.approx(8, abs=0.05)
 
 
 def test_rejects_unknown_asset(settings):
@@ -188,4 +194,4 @@ def test_conviction_still_bounded_by_total_risk(settings):
     settings.risk.confident_risk_x = 3
     settings.risk.max_total_risk_pct = 2
     v = check(idea(confidence=95), settings, book(), price=100.5, atr=4, rules=RULES)
-    assert any("open risk" in r for r in v.reasons)
+    assert v.risk_amount <= 20 + 1e-6

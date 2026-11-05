@@ -6,6 +6,7 @@ from tradedesk.config import Horizon, Market, Settings
 from tradedesk.models import Rating, Side, TradeIdea
 
 SPOT_FEE_BUFFER = 0.0015
+MIN_FIT = 0.5
 
 
 @dataclass
@@ -134,10 +135,15 @@ def check(
                 f"protected floor ({limits.floor_pct}% of {principal:.2f})"
             )
         risk_amount = max(0.0, min(risk_amount, room))
-    if (book.open_risk + risk_amount) / book.active_equity * 100 > limits.max_total_risk_pct:
-        reasons.append(
-            f"open risk {book.open_risk:.2f} plus this trade exceeds {limits.max_total_risk_pct}%"
-        )
+    budget = book.active_equity * limits.max_total_risk_pct / 100 - book.open_risk
+    if risk_amount > budget:
+        # shrink to what the cap has left; refuse when that's under half the normal size
+        if budget < risk_amount * MIN_FIT:
+            reasons.append(
+                f"open risk {book.open_risk:.2f} leaves {max(budget, 0):.2f} under the "
+                f"{limits.max_total_risk_pct}% cap, less than half this trade's normal risk"
+            )
+        risk_amount = max(0.0, budget)
 
     qty = risk_amount / stop_dist if risk_amount > 0 else 0.0
     cap = book.active_equity * limits.max_position_pct / 100
