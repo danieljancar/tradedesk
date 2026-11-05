@@ -216,3 +216,15 @@ def test_futures_cancels_stop_when_target_fails(settings):
     with pytest.raises(BinanceError):
         broker.place(plan(entry_type="market"))
     assert params(cancel.calls[0])["algoId"] == "11"
+
+
+@respx.mock
+def test_futures_trades_cross_in_multi_assets_mode(settings):
+    s = settings.model_copy(update={"market": Market.FUTURES})
+    respx.post(f"{FUT}/fapi/v1/marginType").mock(
+        return_value=httpx.Response(400, json={"code": -4168, "msg": "Multi-Assets mode"})
+    )
+    leverage = respx.post(f"{FUT}/fapi/v1/leverage").mock(return_value=httpx.Response(200, json={}))
+    broker = FuturesBroker(s, Client(FUT, "k", "s"), FakeMarket())
+    broker._prepare("SOLUSDT", 3)
+    assert leverage.called

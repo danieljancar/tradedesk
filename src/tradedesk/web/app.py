@@ -190,7 +190,7 @@ def create_app(desk: Desk) -> FastAPI:
         return out
 
     def starting() -> bool:
-        """daily.sh holds this lock from start to end; agents take a minute before the run shows up."""
+        """daily.sh holds this lock while it runs, before the agents open the run."""
         cfg = Path(os.environ.get("DESK_CONFIG", "desk.toml")).stem
         return (ROOT / "data" / "logs" / f"{cfg}.lock").is_dir()
 

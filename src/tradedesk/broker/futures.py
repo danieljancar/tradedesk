@@ -12,7 +12,7 @@ from tradedesk.db import now
 
 
 class FuturesBroker:
-    """USDT-M futures, one-way mode, isolated margin.
+    """USDT-M futures, one-way mode, isolated margin (cross in Multi-Assets mode).
 
     Entries are market orders only, sent when price reaches the plan's entry. Stop and target
     go out right after the fill as conditional closePosition orders. If the stop can't be
@@ -43,7 +43,9 @@ class FuturesBroker:
         try:
             self.client.signed("POST", "/fapi/v1/marginType", symbol=symbol, marginType="ISOLATED")
         except BinanceError as e:
-            if e.code != -4046:
+            # -4046: already isolated. -4168: Multi-Assets mode only allows cross margin,
+            # whose liquidation sits further out than the isolated one the risk engine checks.
+            if e.code not in (-4046, -4168):
                 raise
         self.client.signed("POST", "/fapi/v1/leverage", symbol=symbol, leverage=leverage)
 
