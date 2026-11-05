@@ -189,6 +189,11 @@ def create_app(desk: Desk) -> FastAPI:
             out.append({"ts": r["ts"], "value": r["value"] + last})
         return out
 
+    def starting() -> bool:
+        """daily.sh holds this lock from start to end; agents take a minute before the run shows up."""
+        cfg = Path(os.environ.get("DESK_CONFIG", "desk.toml")).stem
+        return (ROOT / "data" / "logs" / f"{cfg}.lock").is_dir()
+
     @app.get("/api/state")
     def state() -> dict:
         positions = tagged("SELECT * FROM positions WHERE status = 'open' ORDER BY opened_at")
@@ -200,6 +205,7 @@ def create_app(desk: Desk) -> FastAPI:
                 p["price"] = None
         return {
             "mode": desk.settings.mode,
+            "busy": starting(),
             "market": desk.settings.market,
             "venues": [d.settings.market.value for d, _ in desks],
             "peer": desk.settings.peer_dashboard or None,
@@ -317,7 +323,7 @@ def create_app(desk: Desk) -> FastAPI:
     def run_now(x_desk: str | None = Header(None)) -> dict:
         guard(x_desk)
         latest = db.latest_run()
-        if latest and latest["status"] == "running":
+        if starting() or (latest and latest["status"] == "running"):
             raise HTTPException(409, "a run is already going")
         subprocess.Popen(
             ["bash", str(ROOT / "scripts" / "daily.sh")],

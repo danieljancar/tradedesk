@@ -6,6 +6,15 @@ cd "$(dirname "$0")/.."
 mkdir -p data/logs
 cfg="$(basename "${DESK_CONFIG:-desk.toml}" .toml)"
 log="data/logs/$(date +%Y-%m-%d)-$cfg.log"
+out="data/logs/last-run-$cfg.json"
+lock="data/logs/$cfg.lock"
+# One run per desk at a time. A lock older than an hour is left over from a crash.
+if [ -d "$lock" ] && [ -z "$(find "$lock" -maxdepth 0 -mmin +60)" ]; then
+  echo "=== $(date '+%F %T') a run is already going, not starting another" >>"$log"
+  exit 0
+fi
+rm -rf "$lock"; mkdir -p "$lock"
+trap 'rm -rf "$lock"' EXIT
 echo "=== $(date '+%F %T') daily run" >>"$log"
 
 # A quiet hour needs no agents: the sync still handles fills, stops and trailing.
@@ -19,13 +28,13 @@ claude -p "/daily" --output-format json --permission-mode dontAsk --allowedTools
   "Bash(uv run desk news)" "Bash(uv run desk book)" "Bash(uv run desk post:*)" \
   "Bash(uv run desk check:*)" "Bash(uv run desk execute)" "Bash(uv run desk status)" \
   "Bash(uv run desk plans:*)" "Bash(uv run desk journal:*)" \
-  "Read" "Write" "Agent" "WebSearch" >"data/logs/last-run.json" 2>>"$log"
+  "Read" "Write" "Agent" "WebSearch" >"$out" 2>>"$log"
 status=$?
-cat data/logs/last-run.json >>"$log"
+cat "$out" >>"$log"; echo >>"$log"
 # one line per run with tokens and the API-equivalent cost, for the usage view
-python3 - <<'PY' >>data/logs/usage.jsonl 2>/dev/null || true
+RUN_OUT="$out" python3 - <<'PY' >>data/logs/usage.jsonl 2>/dev/null || true
 import json, os, datetime
-r = json.load(open("data/logs/last-run.json"))
+r = json.load(open(os.environ["RUN_OUT"]))
 u = r.get("usage") or {}
 print(json.dumps({
     "ts": datetime.datetime.now().isoformat(timespec="seconds"),

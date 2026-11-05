@@ -20,7 +20,7 @@ export default function Desk() {
   const [note, setNote] = useState("");
   const pick = useCallback((id: string) => setAgent(id), []);
   const run = d.runs.find((r) => r.id === d.runId);
-  const live = run?.status === "running";
+  const live = run?.status === "running" || (!!d.state?.busy && run?.id === d.runs[0]?.id);
   const last = useMemo(() => {
     const m: Record<string, DeskEvent> = {};
     for (const e of d.events) if (CAST[e.actor]) m[e.actor] = e;

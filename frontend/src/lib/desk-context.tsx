@@ -71,7 +71,7 @@ export function DeskProvider({ children }: { children: ReactNode }) {
     if (await act("/api/notes", "POST", n.kind === "level" ? "Level saved, the desk will see it" : "Note saved, the desk reads it next run", { kind: "note", ...n })) loadNotes();
   }, [act, loadNotes]);
   const dropNote = useCallback(async (id: number) => { if (await act(`/api/notes/${id}`, "DELETE")) loadNotes(); }, [act, loadNotes]);
-  const runNow = useCallback(async () => { await act("/api/run", "POST", "Desk run started. Watch it on the Desk page."); }, [act]);
+  const runNow = useCallback(async () => { await act("/api/run", "POST", "Desk run started. The agents need a minute or two before the first notes show up on the Desk page."); }, [act]);
 
   const watch = universe.length
     ? [...new Set(universe.map((u) => u.asset))]

@@ -34,7 +34,7 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
   const [syncing, setSyncing] = useState(false);
   const [more, setMore] = useState(false);
   const latest = d.runs[0];
-  const live = latest?.status === "running";
+  const live = latest?.status === "running" || !!d.state?.busy;
   const lastAt = useClock(latest?.started_at);
   const eq = d.state?.equity.at(-1)?.value;
   const first = d.state?.equity[0]?.value;

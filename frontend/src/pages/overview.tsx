@@ -18,7 +18,7 @@ export default function Overview() {
   const m = d.macro;
   const [note, setNote] = useState("");
   const latest = d.runs[0];
-  const live = latest?.status === "running";
+  const live = latest?.status === "running" || !!d.state?.busy;
   const pm = [...d.events].reverse().find((e) => e.actor === "pm" && e.kind !== "start" && e.html);
   const waiting = d.state?.plans.filter((p) => p.status === "proposed") ?? [];
   const r = m?.regime;
