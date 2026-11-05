@@ -43,3 +43,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
+
+[tool.uv]
+# a uv-managed Python, so a Homebrew upgrade never pulls the interpreter out from under the venv
+python-preference = "only-managed"
