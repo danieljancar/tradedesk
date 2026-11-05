@@ -38,6 +38,14 @@ auto_execute = false   # true sends every plan that passes the risk check withou
 close_expired = true   # close positions held longer than their horizon allows
 entry_ttl_hours = 24   # cancel limit entries that haven't filled by then
 
+[trailing]
+enabled = true          # the sync raises stops on winning trades every 10 min
+breakeven_r = 1.0       # at +1R the stop moves to entry plus fees
+trail_start_r = 1.5     # from +1.5R the stop follows the price
+trail_atr = 2.0         # this many ATRs behind the price (4h ATR for short trades, 1d otherwise)
+lock_pct = 50.0         # and never keeps less than this share of the open gain
+min_step_atr = 0.25     # smaller moves are skipped so orders aren't replaced all the time
+
 [universe]
 enabled = true                # false uses only the watchlist
 min_quote_volume = 20000000   # skip pairs with less 24h volume in the quote currency

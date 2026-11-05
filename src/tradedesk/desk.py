@@ -4,15 +4,37 @@ from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from tradedesk import analytics, learning, news, notes, portfolio, risk, snapshot, universe
+from tradedesk import (
+    analytics,
+    learning,
+    news,
+    notes,
+    portfolio,
+    risk,
+    snapshot,
+    trailing,
+    universe,
+)
 from tradedesk.binance import market_data
 from tradedesk.broker import Broker, Fill, make_broker
 from tradedesk.broker.base import CloseFailed, Unprotected
 from tradedesk.config import Horizon, Market, Settings
 from tradedesk.db import Database, now
+from tradedesk.indicators import atr
 from tradedesk.models import PlanFile, TradeIdea
 
 CORE_ACTION = "core lots change only through rebalancing"
+
+
+def trailing_line(settings: Settings) -> str:
+    t = settings.trailing
+    if not t.enabled:
+        return "trailing stops: off, stops move only when you tighten them"
+    return (
+        f"trailing stops: on, the sync moves stops every 10 min. At +{t.breakeven_r:g}R to "
+        f"break-even, from +{t.trail_start_r:g}R {t.trail_atr:g} ATR behind price keeping at "
+        f"least {t.lock_pct:g}% of the gain. Tighten further only for a reason the rule can't see."
+    )
 
 
 class Desk:
@@ -197,6 +219,7 @@ class Desk:
             f"{'allowed' if self.settings.market == 'futures' else 'not allowed (spot)'}",
             "max hold days: "
             + ", ".join(f"{k} {v}" for k, v in self.settings.hold_days.model_dump().items()),
+            trailing_line(self.settings),
         ]
         lines += analytics.book_lines(self.db, self.settings.quote)
         if b.sleeve_equity is not None:
@@ -598,7 +621,31 @@ class Desk:
         if self.settings.execution.close_expired and held > timedelta(days=max_days):
             self.close(pos["id"], f"held longer than {max_days} days")
             return [f"position {pos['id']} closed, hold time ran out"]
-        return []
+        return self._trail(pos)
+
+    def _atr(self, symbol: str, horizon: str) -> float | None:
+        frame = "4h" if horizon == Horizon.SHORT else "1d"
+        return atr(market_data(self.settings).klines(symbol, frame, 60))
+
+    def _trail(self, pos: dict) -> list[str]:
+        if not self.settings.trailing.enabled:
+            return []
+        price = self.broker.price(pos["symbol"])
+        move = trailing.next_stop(
+            pos["side"],
+            pos["entry_price"],
+            pos["initial_stop"],
+            pos["stop"],
+            price,
+            self._atr(pos["symbol"], pos["horizon"]),
+            self.settings.trailing,
+        )
+        if move is None:
+            return []
+        result = self.tighten(pos["id"], move.stop, move.reason)
+        if result["status"] != "tightened":
+            return []
+        return [f"position {pos['id']} {pos['asset']} stop raised to {move.stop:g}, {move.reason}"]
 
     def _close_position(self, pos: dict, price: float, reason: str, pnl: float | None) -> None:
         sign = 1 if pos["side"] == "long" else -1

@@ -257,7 +257,7 @@ def create_app(desk: Desk) -> FastAPI:
         except ValueError as e:
             raise HTTPException(422, str(e)) from e
         editable = ("watchlist", "paper_equity", "risk", "execution", "hold_days")
-        for field in (*editable, "portfolio", "universe", "notify"):
+        for field in (*editable, "portfolio", "universe", "notify", "trailing"):
             setattr(desk.settings, field, getattr(new, field))
         return settings_io.read()
 

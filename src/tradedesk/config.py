@@ -73,6 +73,15 @@ class Execution(BaseModel):
     entry_ttl_hours: int = 24
 
 
+class Trailing(BaseModel):
+    enabled: bool = True
+    breakeven_r: float = Field(1.0, gt=0)
+    trail_start_r: float = Field(1.5, gt=0)
+    trail_atr: float = Field(2.0, gt=0)
+    lock_pct: float = Field(50.0, ge=0, lt=100)
+    min_step_atr: float = Field(0.25, ge=0)
+
+
 class Universe(BaseModel):
     enabled: bool = True
     min_quote_volume: float = Field(20_000_000, ge=0)
@@ -150,6 +159,7 @@ class Settings(BaseModel):
     risk: RiskLimits = RiskLimits()
     hold_days: HoldLimits = HoldLimits()
     execution: Execution = Execution()
+    trailing: Trailing = Trailing()
     news_feeds: list[str] = [
         "https://www.coindesk.com/arc/outboundfeeds/rss/",
         "https://cointelegraph.com/rss",

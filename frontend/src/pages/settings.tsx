@@ -87,6 +87,8 @@ export default function Settings() {
   const weightSum = targets.reduce((a, [, w]) => a + Number(w || 0), 0);
   const setTargets = (rows: [string, number][]) => setPort("core_targets", Object.fromEntries(rows.filter(([a]) => a)));
   const tg = d.state?.telegram;
+  const tr = draft.trailing;
+  const setTr = (k: string, v: any) => setDraft({ ...draft, trailing: { ...tr, [k]: v } });
   const setRisk = (k: string, v: any) => setDraft({ ...draft, risk: { ...risk, [k]: v } });
   const setExe = (k: string, v: any) => setDraft({ ...draft, execution: { ...exe, [k]: v } });
   const dirty = JSON.stringify(draft) !== JSON.stringify(s);
@@ -96,7 +98,7 @@ export default function Settings() {
   const save = async () => {
     setSaving(true);
     try {
-      const body: any = { watchlist: draft.watchlist, risk: draft.risk, execution: draft.execution, hold_days: draft.hold_days, universe: draft.universe, portfolio: draft.portfolio, notify: draft.notify };
+      const body: any = { watchlist: draft.watchlist, risk: draft.risk, execution: draft.execution, hold_days: draft.hold_days, universe: draft.universe, portfolio: draft.portfolio, notify: draft.notify, trailing: draft.trailing };
       if (s.mode === "paper") body.paper_equity = draft.paper_equity;
       const c = await send("/api/settings", "PUT", body);
       setCfg(c); setDraft(structuredClone(c.settings));
@@ -188,6 +190,16 @@ export default function Settings() {
           <Field label="Total loss stop" term="drawdown" hint="No new trades until the account recovers."><Num value={risk.max_drawdown_pct} onChange={(v) => setRisk("max_drawdown_pct", v)} step={5} suffix="%" /></Field>
           <Field label="Closest stop" term="atr" hint="Stops nearer than this many ATRs are refused as noise."><Num value={risk.min_stop_atr} onChange={(v) => setRisk("min_stop_atr", v)} step={0.1} suffix="ATR" /></Field>
           <Field label="Furthest limit entry" hint="Limit orders further from price than this are refused."><Num value={risk.max_entry_distance_pct} onChange={(v) => setRisk("max_entry_distance_pct", v)} suffix="%" /></Field>
+        </div>
+      </Box>
+
+      <Box title="Trailing stops" right={<span className="text-xs text-dim">checked every 10 minutes by the sync</span>}>
+        <div className="space-y-4">
+          <Toggle label="Raise stops on winning trades" hint="The stop follows the price up on a long, down on a short, and never moves back." checked={tr.enabled} onChange={(v) => setTr("enabled", v)} />
+          <Field label="Break-even after" term="r" hint="Once a trade is up this much, the stop moves to entry plus fees. The trade can't lose anymore."><Num value={tr.breakeven_r} onChange={(v) => setTr("breakeven_r", v ?? 1)} step={0.25} suffix="R" /></Field>
+          <Field label="Start trailing after" term="r"><Num value={tr.trail_start_r} onChange={(v) => setTr("trail_start_r", v ?? 1.5)} step={0.25} suffix="R" /></Field>
+          <Field label="Distance behind price" term="atr" hint="4-hour ATR for short trades, daily ATR for the rest. Closer locks more profit and stops out sooner."><Num value={tr.trail_atr} onChange={(v) => setTr("trail_atr", v ?? 2)} step={0.25} suffix="ATR" /></Field>
+          <Field label="Keep at least" hint="Share of the open gain the stop protects once trailing."><Num value={tr.lock_pct} onChange={(v) => setTr("lock_pct", v ?? 50)} step={5} suffix="%" /></Field>
         </div>
       </Box>
 

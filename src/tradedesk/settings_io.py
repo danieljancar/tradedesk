@@ -9,7 +9,7 @@ from tradedesk import profiles
 from tradedesk.config import ROOT, RiskLimits, Settings
 
 READ_ONLY = {"mode", "market", "quote", "db_path", "runs_dir"}
-EDITABLE_TABLES = {"risk", "execution", "hold_days", "portfolio", "universe", "notify"}
+EDITABLE_TABLES = {"risk", "execution", "hold_days", "portfolio", "universe", "notify", "trailing"}
 
 
 def config_path() -> Path:
