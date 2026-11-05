@@ -133,3 +133,30 @@ def test_linked_settings_follow_the_main_desk(tmp_path):
     fs = linked_settings(main)
     assert fs.market is Market.FUTURES and fs.runs_dir == main.runs_dir
     assert fs.risk.max_leverage == 10 and fs.watchlist == ["BTC"]
+
+
+def test_local_errors_keep_a_futures_entry_waiting(pair, tmp_path, monkeypatch):
+    from tradedesk.binance.client import BinanceError
+
+    fut = pair.linked
+    [r] = check(
+        pair,
+        tmp_path,
+        idea("ETH", "short", entry_type="limit", entry=101, stop=107, take_profit=88),
+    )
+    fut.approve(r["id"])
+    fut.db.update("plans", r["id"], status="placed")
+
+    def broken(plan):
+        raise FileNotFoundError(2, "No such file or directory")
+
+    monkeypatch.setattr(fut, "_sync_entry", broken)
+    fut.sync()
+    assert fut.db.one("SELECT status FROM plans")["status"] == "placed"
+
+    def refused(plan):
+        raise BinanceError(400, -2019, "Margin is insufficient")
+
+    monkeypatch.setattr(fut, "_sync_entry", refused)
+    fut.sync()
+    assert fut.db.one("SELECT status FROM plans")["status"] == "rejected"

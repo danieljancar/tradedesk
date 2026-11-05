@@ -17,6 +17,7 @@ from tradedesk import (
     universe,
 )
 from tradedesk.binance import market_data
+from tradedesk.binance.client import BinanceError
 from tradedesk.broker import Broker, Fill, make_broker
 from tradedesk.broker.base import CloseFailed, Unprotected
 from tradedesk.config import Horizon, Market, Settings
@@ -656,7 +657,8 @@ class Desk:
                 out += self._sync_entry(plan)
             except Exception as e:
                 self.log("exchange", "error", f"Entry check for plan {plan['id']} failed", str(e))
-                if self.settings.market is Market.FUTURES:
+                # only the exchange refusing the order drops it; a local failure retries next sync
+                if self.settings.market is Market.FUTURES and isinstance(e, BinanceError):
                     self.db.update(
                         "plans",
                         plan["id"],

@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import time
 from datetime import datetime
@@ -321,6 +322,7 @@ def create_app(desk: Desk) -> FastAPI:
         subprocess.Popen(
             ["bash", str(ROOT / "scripts" / "daily.sh")],
             cwd=ROOT,
+            env={**os.environ, "FORCE": "1"},
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,

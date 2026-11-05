@@ -8,7 +8,7 @@ log="data/logs/$(date +%Y-%m-%d).log"
 echo "=== $(date '+%F %T') daily run" >>"$log"
 
 # A quiet hour needs no agents: the sync still handles fills, stops and trailing.
-if ! uv run desk gate >>"$log" 2>&1; then
+if [ -z "${FORCE:-}" ] && ! uv run desk gate >>"$log" 2>&1; then
   uv run desk sync >>"$log" 2>&1 || true
   exit 0
 fi
