@@ -12,6 +12,7 @@ from markdown_it import MarkdownIt
 
 from tradedesk import (
     analytics,
+    ask,
     learning,
     macro,
     notes,
@@ -325,6 +326,23 @@ def create_app(desk: Desk) -> FastAPI:
             start_new_session=True,
         )
         return {"result": "started"}
+
+    asks = ask.Asks(ROOT, desk.settings.path(desk.settings.db_path).with_suffix(".asks.json"))
+
+    @app.get("/api/ask")
+    def ask_list() -> list[dict]:
+        return asks.recent()
+
+    @app.post("/api/ask")
+    def ask_question(body: Annotated[dict, Body()], x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        question = str(body.get("question", "")).strip()
+        if not question:
+            raise HTTPException(422, "empty question")
+        if asks.busy():
+            raise HTTPException(409, "still answering the last question")
+        run_id = desk.run_id()
+        return asks.start(question, desk.run_dir(run_id) if run_id else None)
 
     @app.post("/api/sync")
     def sync(x_desk: str | None = Header(None)) -> dict:
