@@ -25,7 +25,9 @@ On spot, limit entries are sent as one OTOCO order list: the buy, and a stop-los
 
 On USDⓈ-M futures, entries are market orders sent when price reaches the plan's level, in isolated margin. Stop and target go out right after as `closePosition` conditional orders on mark price. If the stop can't be placed, the position is closed at once. Futures limit entries need `desk watch` running, because the desk only sees the price when it syncs.
 
-Stops only move in the trade's favor. Positions are closed when they outlive their horizon (3, 21 or 120 days by default). `desk kill --flatten` cancels everything and closes every position.
+Stops only move in the trade's favor, and the sync moves them for you on a winner. Once a trade is up by its original risk (1R), the stop goes to entry plus fees. From 1.5R it trails 2 ATR behind the price (4h ATR for short trades, daily for the rest) and always keeps at least half the open gain. Every move goes to the exchange as a new stop, and `[trailing]` sets the numbers or turns it off.
+
+Positions are closed when they outlive their horizon (3, 21 or 120 days by default). `desk kill --flatten` cancels everything and closes every position.
 
 The agents can't approve trades, edit the risk code or read `.env`. `.claude/settings.json` blocks it.
 
@@ -57,6 +59,10 @@ To see the dashboard without any setup, `uv run desk demo` replays a made-up run
 
 To run every morning, point cron or launchd at `scripts/daily.sh`. It calls `claude -p "/daily" --permission-mode dontAsk`, which allows only the commands listed in `.claude/settings.json`.
 
+The Markets page shows each coin's chart with the desk's levels, plans and trades, the technical read, and its futures positioning from Binance: open interest, funding against the 0.01% baseline, long/short for all accounts and for top traders, and taker buy/sell, each with a one-line reading. The News page adds CoinGecko's most searched coins, marked by whether Binance lists them. The desk doesn't trade from that list.
+
+To run more than one desk, say spot and futures with their own money, give each a config file with its own `db_path` and `runs_dir` and point `DESK_CONFIG` at it: `DESK_CONFIG=data/futures.toml uv run desk status`. Each gets its own dashboard with `desk serve --port 8431` and its own schedule. Keep their run times apart so two runs don't share a minute.
+
 Once a week, `/review` (or `scripts/review.sh` on a schedule) runs `desk stats` and rewrites `lessons.md`, which the portfolio manager reads before every decision.
 
 ## Telegram
@@ -84,6 +90,8 @@ Every idea counts, taken, passed or rejected. `desk learn` replays each one on r
 `[risk] profile` picks a set of limits: `conservative` risks 0.5% per trade with a 10% drawdown pause, `balanced` is the default set above, `aggressive` risks 2% with a 25% pause. Any limit you write in `[risk]` yourself overrides the profile, and the dashboard only writes back the keys that differ from it.
 
 `[portfolio]` splits the account in two. `core_pct = 30` with `core_targets = { BTC = 60, PAXG = 40 }` keeps 30% of equity as a long-term core and lets the desk trade the other 70%. Trade size, open risk and the position cap use the active part only; the daily loss limit and the drawdown pause still use the whole account. `desk rebalance` shows each core asset's target, value and drift, and `desk rebalance --propose` turns any asset more than `rebalance_band_pct` under its target into a market buy plan with sleeve `core`, a stop 35% under entry and a target at 1.9x. These skip the confidence, reward/risk and ATR rules, but not exchange minimums, free cash, the daily loss limit or the drawdown pause, and they wait for approval like any plan. An asset over its band gets trims: whole core lots, newest first, that bring it down without going under target. Trims sit in the `trims` table until you run `desk trim ID` (or approve them in the dashboard) and then `desk execute`. Trims of an asset you removed from `core_targets` always wait for your approval, even with `auto_execute` on. Core positions never expire, and the plans file can't close them or move their stops. The core needs `market = "spot"`; on futures the rebalance does nothing.
+
+`confident_risk_x` in `[risk]` sizes up when the portfolio manager is sure. At 2, a plan at `min_confidence` risks the normal `risk_per_trade_pct`, a plan at `confident_at` (85 by default) or higher risks twice that, and everything in between scales in a straight line. The cap on all open stops, the protected floor and the futures liquidation check still apply, and the book tells the agents that confidence now sets the size.
 
 `desk analytics` (and `GET /api/analytics`) prints total return, max and current drawdown, Sharpe and Sortino (after 14 days), best and worst day, win rate, profit factor, expectancy in R and in quote, and the same per asset, horizon, side, sleeve and exit reason, next to BTC bought and held over the same days. `GET /api/portfolio` has equity in quote and in `base_currency`, both sleeves, allocation by asset and asset class, core drift and the waiting rebalance. The CHF value uses FRED's DEXSZUS rate with USDT counted as USD; when FRED doesn't answer the output says so.
 

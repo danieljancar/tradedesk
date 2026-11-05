@@ -186,7 +186,7 @@
   }
 
   .shot.inline { margin: 0; }
-  .features { margin-top: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+  .features { margin-top: 40px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px 48px; }
   @media (max-width: 900px) { .features { grid-template-columns: 1fr; gap: 20px; } }
   .features p { color: var(--ink-2); font-size: 16px; margin: 0; }
 
@@ -346,7 +346,7 @@
       <ul class="rules">
         <li><b>Stop on the exchange first.</b> On spot, entry, stop and target go out as one order list. If a stop can't be placed on futures, the position is closed at once.</li>
         <li><b>Your laptop can be off.</b> Because Binance holds the stop, a failed run or a dead battery doesn't leave a position open without one.</li>
-        <li><b>Stops only move your way.</b> Nothing in the code can widen a stop against you.</li>
+        <li><b>Stops only move your way.</b> Nothing in the code can widen a stop against you. On a winner the stop goes to break-even at 1R and then trails the price.</li>
         <li><b>A bad day ends the day.</b> After a 3% daily loss there are no new trades until the next UTC day.</li>
         <li><b>A bad month ends trading.</b> At 15% drawdown the desk stops opening positions until equity recovers.</li>
         <li><b>Limits on everything open.</b> At most 4 positions, 4% total risk across all stops, 3x leverage on futures.</li>
@@ -368,6 +368,7 @@
       <div class="features">
         <div><h3>Macro regime</h3><p>S&amp;P 500, Nasdaq, dollar, 10-year yield, yield curve, VIX, oil, the Fed balance sheet and stablecoin supply, summed up as risk-on or risk-off.</p></div>
         <div><h3>Charts, news and plans</h3><p>Candles with the levels the analyst used, headlines sorted by asset, and every plan with its entry, stop, target and size.</p></div>
+        <div><h3>Futures positioning</h3><p>Open interest, funding, long/short for all accounts and for the biggest traders, and taker buy/sell from Binance, per coin, with a plain reading under each chart.</p></div>
         <div><h3>An honest report</h3><p>Every idea is replayed on real 1h candles, including the ones you rejected and the ones the risk engine threw out. You see whether the process works before you pay for it.</p></div>
       </div>
     </div>
