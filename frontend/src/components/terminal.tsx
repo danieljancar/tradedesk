@@ -78,7 +78,21 @@ export function useTickers(assets: string[]) {
   const key = assets.join();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [key]);
-  useInterval(load, 30000);
+  useInterval(load, 300000);
+  useEffect(() => {
+    if (!assets.length) return;
+    // live last price and 24h change from Binance's public mini-ticker stream
+    const streams = assets.map((a) => `${a.toLowerCase()}usdt@miniTicker`).join("/");
+    const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+    ws.onmessage = (ev) => {
+      const m = JSON.parse(ev.data)?.data;
+      if (!m?.s?.endsWith("USDT")) return;
+      const a = m.s.slice(0, -4), price = +m.c, open = +m.o;
+      setTicks((t) => ({ ...t, [a]: { ...t[a], spark: t[a]?.spark ?? [], price, ch: open ? ((price - open) / open) * 100 : t[a]?.ch ?? 0 } }));
+    };
+    return () => ws.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
   return ticks;
 }
 

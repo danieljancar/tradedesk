@@ -78,8 +78,9 @@ export function MarketChart({ asset, tf, overlay, lines, markers, drawing, onPic
     const candles = chart.addSeries(CandlestickSeries, { upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down });
     seriesRef.current = candles;
     candles.setData(data.map((c) => ({ time: t(c), open: c.open, high: c.high, low: c.low, close: c.close })));
+    let vol: ISeriesApi<"Histogram"> | null = null;
     if (overlay.volume) {
-      const vol = chart.addSeries(HistogramSeries, { priceScaleId: "vol", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
+      vol = chart.addSeries(HistogramSeries, { priceScaleId: "vol", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
       chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.84, bottom: 0 } });
       const us = cssColor("--up", 0.35), ds = cssColor("--down", 0.35);
       vol.setData(data.map((c) => ({ time: t(c), value: c.volume, color: c.close >= c.open ? us : ds })));
@@ -122,7 +123,19 @@ export function MarketChart({ asset, tf, overlay, lines, markers, drawing, onPic
     }
     const span = tf === "1w" ? 120 : tf === "1d" ? 150 : 180;
     chart.timeScale().setVisibleLogicalRange({ from: data.length - span, to: data.length + 5 });
-    return () => { chart.remove(); chartRef.current = null; seriesRef.current = null; };
+    // the forming candle ticks live from Binance's public stream; the 60s refetch fills any gap
+    const us = cssColor("--up", 0.35), ds = cssColor("--down", 0.35);
+    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${asset.toLowerCase()}usdt@kline_${tf}`);
+    ws.onmessage = (ev) => {
+      const k = JSON.parse(ev.data)?.k;
+      if (!k) return;
+      const time = Math.floor(k.t / 1000) as UTCTimestamp;
+      if (time < (data.at(-1)?.time ?? 0)) return;
+      const bar = { time, open: +k.o, high: +k.h, low: +k.l, close: +k.c };
+      candles.update(bar);
+      vol?.update({ time, value: +k.v, color: bar.close >= bar.open ? us : ds });
+    };
+    return () => { ws.close(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, tf, overlay.ema, overlay.volume, JSON.stringify(lines), JSON.stringify(markers), scheme]);
 
