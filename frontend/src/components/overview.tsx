@@ -7,9 +7,11 @@ import { pc } from "@/lib/learn";
 import { cn } from "@/lib/utils";
 
 type Point = { d: string; v: number };
+type Line = { t1: number; p1: number; i1: number; i2: number; p2: number; t_end: number; p_end: number };
 export type Driver = {
   id: string; name: string; group: string; unit: string; why: string; value: number | null; as_of: string | null;
   change_1w: number | null; change_1m: number | null; change_3m: number | null; series: Point[]; tilt: number; reason: string;
+  pattern?: { pattern: string; position: string; upper: Line; lower: Line } | null;
 };
 type Macro = {
   updated: string;
@@ -192,6 +194,38 @@ export function OverviewView() {
         </div>
         <div className="min-h-[200px] bg-panel"><FearGreed series={m.fear_greed} /></div>
       </div>
+    </div>
+  );
+}
+
+const num = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+export function IndexPattern({ d }: { d: Driver }) {
+  const p = d.pattern;
+  const n = d.series.length;
+  const at = (l: Line, i: number) => (i >= l.i1 ? l.p1 + ((l.p2 - l.p1) * (i - l.i1)) / (l.i2 - l.i1) : null);
+  const data = d.series.map((x, i) => ({ d: x.d, v: x.v, up: p ? at(p.upper, i) : null, lo: p ? at(p.lower, i) : null }));
+  const last = d.series.at(-1);
+  return (
+    <div className="min-w-0 bg-panel p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-sm font-medium">{d.name}</p>
+        <p className="font-mono text-sm tabular-nums">{last ? num(last.v) : "–"} <span className={cn("text-xs", (d.change_1w ?? 0) >= 0 ? "text-up" : "text-down")}>{d.change_1w != null ? `${d.change_1w >= 0 ? "+" : ""}${d.change_1w.toFixed(1)}% 1w` : ""}</span></p>
+      </div>
+      <div className="mt-1 h-32">
+        {n > 1 && (
+          <ChartContainer config={{ v: { label: d.name, color: "var(--brand)" }, up: { label: "Upper line", color: "var(--ema200)" }, lo: { label: "Lower line", color: "var(--ema200)" } }} className="aspect-auto h-full w-full">
+            <LineChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <XAxis dataKey="d" hide /><YAxis hide domain={["auto", "auto"]} />
+              <ChartTooltip content={<ChartTooltipContent labelFormatter={(l) => String(l)} formatter={(v, k) => <span className="font-mono">{k === "v" ? d.name : k === "up" ? "Upper line" : "Lower line"} {num(Number(v))}</span>} />} />
+              <Line dataKey="v" stroke="var(--color-v)" strokeWidth={1.6} dot={false} isAnimationActive={false} />
+              <Line dataKey="up" stroke="var(--color-up)" strokeDasharray="4 3" strokeWidth={1.4} dot={false} connectNulls isAnimationActive={false} />
+              <Line dataKey="lo" stroke="var(--color-lo)" strokeDasharray="4 3" strokeWidth={1.4} dot={false} connectNulls isAnimationActive={false} />
+            </LineChart>
+          </ChartContainer>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-dim">{p ? `${p.pattern[0].toUpperCase()}${p.pattern.slice(1)}, price ${p.position}` : "No clear pattern"}{d.as_of ? `, close ${d.as_of}` : ""}</p>
     </div>
   );
 }

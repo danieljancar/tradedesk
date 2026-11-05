@@ -4,7 +4,7 @@ import { ArrowRight, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Box, Page } from "@/components/shell";
-import { Compare, DriverCard, FearGreed, big, type Driver } from "@/components/overview";
+import { Compare, DriverCard, FearGreed, IndexPattern, big, type Driver } from "@/components/overview";
 import { Avatar } from "@/components/panels";
 import { Prose } from "@/components/prose";
 import { useDeskCtx } from "@/lib/desk-context";
@@ -72,6 +72,14 @@ export default function Overview() {
             </Box>
             <Box title="Crowd mood" pad={false}><div className="h-72"><FearGreed series={m?.fear_greed ?? []} /></div></Box>
           </div>
+
+          {drivers.some((x) => x.pattern !== undefined && ["SP500", "NASDAQCOM"].includes(x.id)) && (
+            <Box title="Index patterns" right={<span className="text-xs text-dim">120 days, daily closes</span>} pad={false}>
+              <div className="grid gap-px bg-line sm:grid-cols-2">
+                {drivers.filter((x) => ["SP500", "NASDAQCOM"].includes(x.id)).map((x) => <IndexPattern key={x.id} d={x} />)}
+              </div>
+            </Box>
+          )}
         </div>
 
         <div className="space-y-4">

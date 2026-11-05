@@ -12,6 +12,9 @@ from datetime import UTC, date, datetime, timedelta
 
 import httpx
 
+from tradedesk import patterns
+from tradedesk.indicators import Candle
+
 FRED = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 UA = {"User-Agent": "tradedesk/0.1 (+https://github.com/danieljancar/tradedesk)"}
 
@@ -176,6 +179,18 @@ def _verdict(sid: str, points: list[tuple[str, float]]) -> tuple[int, str]:
     return 0, ""
 
 
+PATTERNED = {"SP500", "NASDAQCOM"}
+
+
+def _pattern(tail: list) -> dict | None:
+    """Daily closes only, so the swing points are closes rather than highs and lows."""
+    candles = [
+        Candle(int(datetime.fromisoformat(d).replace(tzinfo=UTC).timestamp() * 1000), v, v, v, v, 0)
+        for d, v in tail
+    ]
+    return patterns.find(candles, lookback=len(candles), width=4)
+
+
 def _pack(sid, name, group, unit, why, points) -> dict:
     tilt, reason = _verdict(sid, points)
     tail = points[-120:]
@@ -193,6 +208,7 @@ def _pack(sid, name, group, unit, why, points) -> dict:
         "series": [{"d": d, "v": v} for d, v in tail],
         "tilt": tilt,
         "reason": reason,
+        "pattern": _pattern(tail) if sid in PATTERNED and len(tail) > 30 else None,
     }
 
 

@@ -40,3 +40,19 @@ def test_finds_converging_lines():
 
 def test_too_few_candles():
     assert find(candles([1, 2, 3], [0, 1, 2])) is None
+
+
+def test_index_closes_get_a_pattern():
+    from datetime import date, timedelta
+
+    from tradedesk.macro import _pack
+
+    start = date(2026, 6, 1)
+    pts = [
+        ((start + timedelta(days=i)).isoformat(), 6000 + 40 * ((i % 10) - 5) * (1 - i / 200) + i)
+        for i in range(140)
+    ]
+    d = _pack("SP500", "S&P 500", "Stocks", "", "", pts)
+    assert d["pattern"] and d["pattern"]["pattern"]
+    assert len(d["series"]) == 120
+    assert _pack("VIXCLS", "VIX", "Risk", "", "", pts)["pattern"] is None
