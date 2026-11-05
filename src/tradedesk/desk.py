@@ -26,6 +26,16 @@ from tradedesk.models import PlanFile, TradeIdea
 CORE_ACTION = "core lots change only through rebalancing"
 
 
+def conviction_note(limits) -> str:
+    if limits.confident_risk_x <= 1:
+        return ""
+    top = limits.risk_per_trade_pct * limits.confident_risk_x
+    return (
+        f" rising to {top:g}% at confidence {limits.confident_at}+, so set confidence "
+        "honestly, it sizes the trade"
+    )
+
+
 def trailing_line(settings: Settings) -> str:
     t = settings.trailing
     if not t.enabled:
@@ -213,7 +223,8 @@ class Desk:
             f"equity {b.equity:.2f} | free {b.free_quote:.2f} | peak {b.peak_equity:.2f} | "
             f"realized today {b.day_pnl:+.2f} | open risk {b.open_risk:.2f} "
             f"({b.open_risk / b.equity * 100:.1f}% of {limits.max_total_risk_pct}%)",
-            f"rules: risk {limits.risk_per_trade_pct}% per trade, min reward/risk "
+            f"rules: risk {limits.risk_per_trade_pct}% per trade{conviction_note(limits)}, "
+            f"min reward/risk "
             f"{limits.min_reward_risk}, max {limits.max_open_positions} positions, "
             f"min confidence {limits.min_confidence}, shorts "
             f"{'allowed' if self.settings.market == 'futures' else 'not allowed (spot)'}",

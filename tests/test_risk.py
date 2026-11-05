@@ -169,3 +169,23 @@ def test_futures_leverage_uses_margin_slot(settings):
     v = check(idea(stop=98, take_profit=106), settings, book(), price=100.5, atr=None, rules=RULES)
     assert v.ok, v.reasons
     assert v.qty * v.entry / v.leverage <= 1000 / 4 + 1e-6
+
+
+def test_conviction_scales_risk_with_confidence(settings):
+    from tradedesk.risk import position_risk
+
+    settings.risk.risk_per_trade_pct = 2
+    settings.risk.min_confidence = 60
+    settings.risk.confident_at = 80
+    settings.risk.confident_risk_x = 2
+    assert position_risk(settings, book(equity=100), 60) == pytest.approx(2.0)
+    assert position_risk(settings, book(equity=100), 70) == pytest.approx(3.0)
+    assert position_risk(settings, book(equity=100), 95) == pytest.approx(4.0)
+    assert position_risk(settings, book(equity=100)) == pytest.approx(2.0)
+
+
+def test_conviction_still_bounded_by_total_risk(settings):
+    settings.risk.confident_risk_x = 3
+    settings.risk.max_total_risk_pct = 2
+    v = check(idea(confidence=95), settings, book(), price=100.5, atr=4, rules=RULES)
+    assert any("open risk" in r for r in v.reasons)

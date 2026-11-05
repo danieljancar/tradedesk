@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Box, Page } from "@/components/shell";
 import { MarketChart, cssColor, type LineSpec, type MarkerSpec, type Overlay } from "@/components/market-chart";
+import { Positioning } from "@/components/positioning";
 import { Prose } from "@/components/prose";
 import { Term } from "@/components/term";
 import { useTickers } from "@/components/terminal";
@@ -203,6 +204,7 @@ export default function Markets() {
               </ul>
             </Box>
           </div>
+          <Positioning asset={asset} />
         </div>
 
         <div className="space-y-4">

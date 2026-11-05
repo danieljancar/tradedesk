@@ -45,6 +45,9 @@ class RiskLimits(BaseModel):
     # House money: principal is risked at risk_per_trade_pct, profits above it at profit_risk_pct.
     principal: float | None = Field(None, gt=0)
     profit_risk_pct: float = Field(0.0, ge=0, le=25)
+    # Conviction: risk grows from 1x at min_confidence to confident_risk_x at confident_at.
+    confident_risk_x: float = Field(1.0, ge=1, le=3)
+    confident_at: int = Field(85, ge=1, le=100)
     # Share of the principal that open stops may never put at risk, all stops hit at once.
     floor_pct: float = Field(0.0, ge=0, le=100)
     # Futures: maintenance margin used to estimate the liquidation price (isolated margin).

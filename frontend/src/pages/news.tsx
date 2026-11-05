@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ExternalLink, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Box, Page } from "@/components/shell";
+import { Trending } from "@/components/trending";
 import { useDeskCtx, type Headline } from "@/lib/desk-context";
 import { cn } from "@/lib/utils";
 
@@ -24,9 +25,9 @@ function trending(items: Headline[]) {
 }
 
 const SOURCES: [string, [string, string][]][] = [
-  ["Charts and derivatives", [["TradingView", "https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT"], ["Binance", "https://www.binance.com/en/futures/BTCUSDT"], ["CoinGlass: funding, open interest, liquidations", "https://www.coinglass.com/"], ["CoinGecko", "https://www.coingecko.com/"]]],
+  ["Charts and derivatives", [["TradingView", "https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT"], ["Binance", "https://www.binance.com/en/futures/BTCUSDT"], ["CoinGlass: funding, open interest, liquidations", "https://www.coinglass.com/"], ["CoinGlass liquidation heatmap", "https://www.coinglass.com/pro/futures/LiquidationHeatMap"], ["DEX Screener: trending DEX pairs", "https://dexscreener.com/?rankBy=trendingScoreH6&order=desc"], ["CoinGecko", "https://www.coingecko.com/"]]],
   ["Macro calendar", [["Economic calendar (Investing.com)", "https://www.investing.com/economic-calendar/"], ["FOMC meeting dates", "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"], ["CME FedWatch: rate odds", "https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html"], ["FRED economic data", "https://fred.stlouisfed.org/"]]],
-  ["Flows and on-chain", [["Bitcoin ETF flows (Farside)", "https://farside.co.uk/btc/"], ["DefiLlama: stablecoins and TVL", "https://defillama.com/stablecoins"], ["Fear & Greed index", "https://alternative.me/crypto/fear-and-greed-index/"]]],
+  ["Flows and on-chain", [["Bitcoin ETF flows (Farside)", "https://farside.co.uk/btc/"], ["DefiLlama: stablecoins and TVL", "https://defillama.com/stablecoins"], ["Fear & Greed index", "https://alternative.me/crypto/fear-and-greed-index/"], ["Supply in profit (ChainExposed)", "https://chainexposed.com/SupplyInProfit.html"], ["Profitable Solana wallets (Dune)", "https://dune.com/crypto_aghora/solana-profitable-wallets"]]],
 ];
 
 export default function News() {
@@ -100,6 +101,7 @@ export default function News() {
         </div>
 
         <div className="space-y-4">
+          <Trending />
           <Box title="Where the numbers come from">
             <div className="space-y-4">
               {SOURCES.map(([group, links]) => (

@@ -3,7 +3,7 @@ import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
@@ -18,6 +18,7 @@ from tradedesk import (
     notify,
     portfolio,
     settings_io,
+    trending,
     universe,
     wire,
 )
@@ -44,7 +45,7 @@ def create_app(desk: Desk) -> FastAPI:
     if (DIST / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
     db = desk.db
-    cache: dict[tuple, tuple[float, list]] = {}
+    cache: dict[tuple, tuple[float, Any]] = {}
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
@@ -289,6 +290,43 @@ def create_app(desk: Desk) -> FastAPI:
         if run_id not in {r["id"] for r in db.all("SELECT id FROM runs")}:
             raise HTTPException(404, "unknown run")
         return universe.read(desk.run_dir(run_id)) or []
+
+    @app.get("/api/positioning/{asset}")
+    def positioning(asset: str, period: str = "4h") -> dict:
+        asset = asset.upper()
+        known = {*desk.settings.watchlist, "BTC", "ETH", *(a["asset"] for a in desk.run_assets())}
+        if asset not in known or period not in {"1h", "4h", "1d"}:
+            raise HTTPException(404, "unknown asset or period")
+        key = ("positioning", asset, period)
+        hit = cache.get(key)
+        if hit and time.monotonic() - hit[0] < 300:
+            return hit[1]
+        out = market_data(desk.settings).positioning(f"{asset}{desk.settings.quote}", period)
+        cache[key] = (time.monotonic(), out)
+        return out
+
+    @app.get("/api/trending")
+    def trending_coins() -> list[dict]:
+        hit = cache.get(("listed",))
+        if hit and time.monotonic() - hit[0] < 3600:
+            listed = hit[1]
+        else:
+            try:
+                symbols = market_data(desk.settings).spot_symbols()
+            except Exception:
+                symbols = []
+            quote = desk.settings.quote
+            listed = {
+                s["baseAsset"]
+                for s in symbols
+                if s.get("quoteAsset") == quote and s.get("status") == "TRADING"
+            }
+            if listed:
+                cache[("listed",)] = (time.monotonic(), listed)
+        rows = trending.coins(listed)
+        if rows is None:
+            raise HTTPException(502, "CoinGecko did not answer")
+        return rows
 
     @app.get("/api/analytics")
     def analytics_report() -> dict:

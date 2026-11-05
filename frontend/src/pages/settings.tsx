@@ -174,6 +174,8 @@ export default function Settings() {
           <Field label="Risk on your money" term="risk" hint="Share of the account lost if a stop is hit. Max 5%."><Num value={risk.risk_per_trade_pct} onChange={(v) => setRisk("risk_per_trade_pct", v)} suffix="%" /></Field>
           <Field label="Principal" hint="The money you put in. Leave empty to size everything from the current balance."><Num value={risk.principal} onChange={(v) => setRisk("principal", v)} step={10} suffix="USDT" /></Field>
           <Field label="Risk on profits" hint="House money: profits above the principal can be risked at this higher rate."><Num value={risk.profit_risk_pct} onChange={(v) => setRisk("profit_risk_pct", v)} suffix="%" /></Field>
+          <Field label="Extra risk on strong conviction" term="confidence" hint="1× turns it off. At 2× a trade at the confidence below risks twice the normal amount, scaled from the minimum confidence up."><Num value={risk.confident_risk_x} onChange={(v) => setRisk("confident_risk_x", v ?? 1)} step={0.25} suffix="×" /></Field>
+          <Field label="Full conviction at" term="confidence" hint="Confidence where the extra risk reaches its top."><Num value={risk.confident_at} onChange={(v) => setRisk("confident_at", v ?? 85)} step={5} /></Field>
           <Field label="Protected floor" hint="Share of the principal that open stops may never put at risk, even if every stop hits at once."><Num value={risk.floor_pct} onChange={(v) => setRisk("floor_pct", v)} step={5} suffix="%" /></Field>
         </div>
       </Box>

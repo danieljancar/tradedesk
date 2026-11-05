@@ -122,7 +122,7 @@ def check(
     if rr < limits.min_reward_risk:
         reasons.append(f"reward/risk {rr:.2f} below {limits.min_reward_risk}")
 
-    risk_amount = position_risk(settings, book)
+    risk_amount = position_risk(settings, book, idea.confidence)
     if limits.principal and limits.floor_pct:
         room = book.equity - limits.principal * limits.floor_pct / 100 - book.open_risk
         if room <= 0:
@@ -173,14 +173,27 @@ def check(
     )
 
 
-def position_risk(settings: Settings, book: Book) -> float:
+def conviction(settings: Settings, confidence: int | None) -> float:
+    """Risk multiplier: 1 at the minimum confidence, confident_risk_x at confident_at and above."""
+    limits = settings.risk
+    if confidence is None or limits.confident_risk_x <= 1:
+        return 1.0
+    span = limits.confident_at - limits.min_confidence
+    if span <= 0:
+        return limits.confident_risk_x if confidence >= limits.confident_at else 1.0
+    share = min(1.0, max(0.0, (confidence - limits.min_confidence) / span))
+    return 1 + (limits.confident_risk_x - 1) * share
+
+
+def position_risk(settings: Settings, book: Book, confidence: int | None = None) -> float:
     """Loss at the stop. With a principal set, profits above it are risked at their own rate."""
     limits, equity = settings.risk, book.active_equity
+    scale = conviction(settings, confidence)
     if not limits.principal:
-        return equity * limits.risk_per_trade_pct / 100
+        return equity * limits.risk_per_trade_pct / 100 * scale
     on_principal = min(equity, limits.principal) * limits.risk_per_trade_pct / 100
     profit = max(0.0, equity - limits.principal)
-    return on_principal + profit * limits.profit_risk_pct / 100
+    return (on_principal + profit * limits.profit_risk_pct / 100) * scale
 
 
 def horizon_atr(horizon: Horizon, facts: dict) -> float | None:

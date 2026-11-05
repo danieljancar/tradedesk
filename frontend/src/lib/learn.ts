@@ -80,6 +80,18 @@ export const GLOSSARY: Record<string, Term> = {
     long: "2.57 means 2.57 accounts long for each account short. When one side is very crowded, a move against them can force many to exit at once and the move gets sharper. People call that a flush or squeeze.",
     match: /\blong\/short\b/i,
   },
+  taker: {
+    term: "Taker buy/sell ratio",
+    short: "Market buys divided by market sells on futures.",
+    long: "Above 1 means more traders are hitting the buy button at whatever price they get, so buyers are in a hurry. Below 1 means sellers are. It shows who is pushing right now, not who is right.",
+    match: /\btaker\b/i,
+  },
+  top_traders: {
+    term: "Top traders",
+    short: "The biggest 20% of futures accounts on Binance by margin.",
+    long: "Their long/short ratio is measured by position size, not by number of accounts. When the crowd is long but the big accounts lean short, the crowd is often the one that gets squeezed.",
+    match: /\btop traders\b/i,
+  },
   crowding: {
     term: "Crowding / flush",
     short: "Too many traders on the same side, and the sharp move when they're forced out.",
@@ -178,7 +190,7 @@ export const GLOSSARY: Record<string, Term> = {
   confidence: {
     term: "Confidence",
     short: "How sure the portfolio manager is, 0 to 100.",
-    long: "Under 60 the risk engine refuses the trade. Lower confidence also means a smaller size.",
+    long: "Under the minimum the risk engine refuses the trade. With extra risk on strong conviction turned on, higher confidence also means a bigger size.",
     match: /\bconfidence\b/i,
   },
   bias: {

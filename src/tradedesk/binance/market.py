@@ -87,6 +87,34 @@ class MarketData:
             "long_short_ratio": float(ratio[-1]["longShortRatio"]) if ratio else None,
         }
 
+    def positioning(self, symbol: str, period: str = "4h", limit: int = 60) -> dict:
+        """Futures positioning history: open interest, funding, long/short and taker flow.
+        Each series is empty when Binance has no futures market for the symbol."""
+
+        def get(path: str, **params) -> list:
+            try:
+                return self.futures.public(path, symbol=symbol, **params) or []
+            except Exception:
+                return []
+
+        window = {"period": period, "limit": limit}
+        oi = get("/futures/data/openInterestHist", **window)
+        accounts = get("/futures/data/globalLongShortAccountRatio", **window)
+        top = get("/futures/data/topLongShortPositionRatio", **window)
+        taker = get("/futures/data/takerlongshortRatio", **window)
+        funding = get("/fapi/v1/fundingRate", limit=min(limit, 100))
+
+        def series(rows: list, time_key: str, name: str, field: str, scale: float = 1) -> list:
+            return [{"t": r[time_key] // 1000, name: float(r[field]) * scale} for r in rows]
+
+        return {
+            "open_interest": series(oi, "timestamp", "usd", "sumOpenInterestValue"),
+            "long_short": series(accounts, "timestamp", "accounts", "longShortRatio"),
+            "top_traders": series(top, "timestamp", "positions", "longShortRatio"),
+            "taker": series(taker, "timestamp", "ratio", "buySellRatio"),
+            "funding": series(funding, "fundingTime", "pct", "fundingRate", 100),
+        }
+
     @cached_property
     def _exchange_info(self) -> dict:
         path = "/api/v3/exchangeInfo" if self.market is Market.SPOT else "/fapi/v1/exchangeInfo"
