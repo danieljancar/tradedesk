@@ -44,11 +44,15 @@ type Handles = {
   chart: IChartApi;
   candles: ISeriesApi<"Candlestick">;
   vol: ISeriesApi<"Histogram"> | null;
-  emas: [number, ISeriesApi<"Line">][];
+  emas: [number, string, ISeriesApi<"Line">][];
   marks: ISeriesMarkersPluginApi<Time>;
   prices: IPriceLine[];
   segs: ISeriesApi<"Line">[];
 };
+
+// averages never stretch the price scale, the candles decide its height
+const avgLine = (chart: IChartApi, color: string) =>
+  chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: () => null });
 
 // the candle an event happened in
 function barOf(data: Candle[], ts: number) {
@@ -102,7 +106,13 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
       const got = await api<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=1000&end=${d[0].time * 1000 - 1}`);
       const fresh = got.filter((c) => c.time < d[0].time);
       if (fresh.length < 2) done.current.add(key);
-      else setOlder((o) => ({ key, bars: [...fresh, ...(o.key === key ? o.bars : [])] }));
+      // a second page can come back before the chart saw the first one; only bars older than
+      // what's already held go in front, or the time line gets duplicates and the chart crashes
+      else setOlder((o) => {
+        const held = o.key === key ? o.bars : [];
+        const head = held[0]?.time ?? Infinity;
+        return { key, bars: [...fresh.filter((c) => c.time < head), ...held] };
+      });
     } catch {
       done.current.add(key);
     } finally {
@@ -154,8 +164,8 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
       chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.84, bottom: 0 } });
     }
     // averages and pattern lines never stretch the price scale, the candles decide its height
-    const emas: [number, ISeriesApi<"Line">][] = overlay.ema
-      ? ([[20, "--ema20"], [50, "--ema50"], [200, "--ema200"]] as const).map(([n, c]) => [n, chart.addSeries(LineSeries, { color: cssColor(c), lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: () => null })])
+    const emas: [number, string, ISeriesApi<"Line">][] = overlay.ema
+      ? ([[20, "--ema20"], [50, "--ema50"], [200, "--ema200"]] as const).map(([n, c]) => [n, cssColor(c), avgLine(chart, cssColor(c))])
       : [];
     const marks = createSeriesMarkers(candles, [] as SeriesMarker<UTCTimestamp>[]);
     h.current = { chart, candles, vol, emas, marks, prices: [], segs: [] };
@@ -230,20 +240,21 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
     const prev = dataRef.current;
     const ts = c.chart.timeScale();
     const before = ts.getVisibleLogicalRange();
+    const grew = !!prev?.length && data[0].time < prev[0].time;
     c.candles.setData(data.map((x) => ({ time: t(x), open: x.open, high: x.high, low: x.low, close: x.close })));
     if (c.vol) {
       const us = cssColor("--up", 0.35), ds = cssColor("--down", 0.35);
       c.vol.setData(data.map((x) => ({ time: t(x), value: x.volume, color: x.close >= x.open ? us : ds })));
     }
     const closes = data.map((x) => x.close);
-    for (const [n, series] of c.emas) {
+    for (const [n, , series] of c.emas) {
       const e = ema(closes, n);
       series.setData(data.flatMap((x, i) => (e[i] == null ? [] : [{ time: t(x), value: e[i]! }])));
     }
     dataRef.current = data;
     if (want.current) applyWant();
     else if (!shown.current) fitAll();
-    else if (prev?.length && before && data[0].time < prev[0].time) {
+    else if (grew && before) {
       // older bars came in at the front: keep the same candles on screen
       const added = data.findIndex((x) => x.time === prev[0].time);
       if (added > 0) ts.setVisibleLogicalRange({ from: before.from + added, to: before.to + added });
