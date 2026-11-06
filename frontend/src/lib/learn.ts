@@ -377,6 +377,15 @@ export function readMood(m: any) {
   return { value: fg.value, label: fg.label, text, week };
 }
 
+/** Plan status as the user should read it. A futures entry that waits for its price is in the
+ * desk only, Binance sees nothing until the price gets there. */
+export function planStatus(p: any) {
+  if (p.status === "proposed") return "waiting for you";
+  if (p.status === "placed" && String(p.exchange ?? "").includes("waiting")) return `waiting for ${px(p.entry)}`;
+  if (p.status === "placed") return "on Binance";
+  return p.status;
+}
+
 /** What a plan puts on the table: the position's value and, on futures, the margin it ties up. */
 export function planSize(p: any) {
   const value = Number(p.qty || 0) * Number(p.entry || 0);

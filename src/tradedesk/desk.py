@@ -1,3 +1,4 @@
+import fcntl
 import json
 import sys
 from collections.abc import Callable, Iterable
@@ -650,8 +651,19 @@ class Desk:
         )
         return position_id
 
-    def sync(self) -> list[str]:
-        out = self.expire_proposals()
+    def entries(self) -> list[str]:
+        """Only the waiting entries, both desks. Cheap enough to run every minute, so a futures
+        entry that waits for a price opens close to it."""
+        return self._entries() + (self.linked._entries() if self.linked else [])
+
+    def _entries(self) -> list[str]:
+        # the minute job and the sync can run at once; one of them checks, or a plan opens twice
+        with open(self.db.path.with_suffix(".entries.lock"), "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            return self._check_entries()
+
+    def _check_entries(self) -> list[str]:
+        out: list[str] = []
         for plan in self.db.all("SELECT * FROM plans WHERE status = 'placed'"):
             try:
                 out += self._sync_entry(plan)
@@ -667,6 +679,10 @@ class Desk:
                         updated_at=now(),
                     )
                 out.append(f"plan {plan['id']}: error, {e}")
+        return out
+
+    def sync(self) -> list[str]:
+        out = self.expire_proposals() + self._entries()
         for pos in self.db.open_positions():
             try:
                 out += self._sync_position(pos)

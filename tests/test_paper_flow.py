@@ -106,3 +106,13 @@ def test_entry_cancelled_when_target_comes_first(settings, db, market, tmp_path)
     assert "target before the entry" in desk.sync()[0]
     assert db.all("SELECT status FROM plans")[0]["status"] == "expired"
     assert db.all("SELECT * FROM positions") == []
+
+
+def test_entries_only_checks_waiting_plans(settings, db, market, tmp_path):
+    desk = make_desk(settings, db, market)
+    [result] = desk.check_plans(plans_file(tmp_path))
+    desk.approve(result["id"])
+    desk.execute()
+    market.add(low=98.5, high=100.5)
+    assert "filled" in desk.entries()[0]
+    assert desk.entries() == []

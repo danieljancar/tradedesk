@@ -150,6 +150,7 @@ def now() -> str:
 
 class Database:
     def __init__(self, path: Path):
+        self.path = path
         path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row

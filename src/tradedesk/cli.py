@@ -170,6 +170,14 @@ def sync() -> None:
 
 
 @app.command()
+def entries() -> None:
+    """Check only the entries waiting for a price. Meant for a job every minute."""
+    lines = desk().entries()
+    if lines:
+        say(lines)
+
+
+@app.command()
 def learn() -> None:
     """Replay every unresolved idea on real 1h candles and record what followed each run."""
     r = desk().learn()

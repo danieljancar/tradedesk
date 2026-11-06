@@ -9,7 +9,7 @@ import { Prose } from "@/components/prose";
 import { Avatar } from "@/components/panels";
 import { OverviewView } from "@/components/overview";
 import { CAST } from "@/lib/cast";
-import { GLOSSARY, pc, planStory, px, readAsset, readMood } from "@/lib/learn";
+import { GLOSSARY, pc, planStatus, planStory, px, readAsset, readMood } from "@/lib/learn";
 import { api, useInterval, type Candle, type DeskEvent, type DeskState, type Plan, type Run } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/lib/query";
@@ -546,7 +546,7 @@ export function ReportView() {
                 <Td className="font-mono text-dim">{String(p.created_at).slice(5, 16).replace("T", " ")}</Td>
                 <Td className="font-medium">{p.asset}</Td>
                 <Td className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</Td>
-                <Td className="text-dim">{p.status}</Td>
+                <Td className="text-dim">{planStatus(p)}</Td>
                 <Td right>{px(p.entry)}</Td><Td right className="text-down">{px(p.stop)}</Td><Td right className="text-up">{px(p.take_profit)}</Td>
                 <Td className={OUTCOME[p.replay.outcome]}>{p.replay.outcome}</Td>
                 <Td right className={tone(p.replay.r)}>{p.replay.r ? p.replay.r.toFixed(2) : "–"}</Td>

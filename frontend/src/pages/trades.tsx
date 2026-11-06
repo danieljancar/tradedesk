@@ -6,7 +6,7 @@ import { Box, Page } from "@/components/shell";
 import { ReportView } from "@/components/terminal";
 import { Term } from "@/components/term";
 import { useDeskCtx } from "@/lib/desk-context";
-import { planSize, planStory, px } from "@/lib/learn";
+import { planSize, planStatus, planStory, px } from "@/lib/learn";
 import { cn } from "@/lib/utils";
 
 const money = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(2)}`;
@@ -62,7 +62,7 @@ export default function Trades() {
           {plans.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
-                <thead><tr><Th>Market</Th><Th>Side</Th><Th>Term</Th><Th right>Entry</Th><Th right>Stop</Th><Th right>Target</Th><Th right>Size</Th><Th right><Term k="rr">R/R</Term></Th><Th right>Risk</Th><Th right><Term k="confidence">Conf.</Term></Th><Th>Status</Th><Th /></tr></thead>
+                <thead><tr><Th>Market</Th><Th>Side</Th><Th>Term</Th><Th right>Entry</Th><Th right>Stop</Th><Th right>Target</Th><Th right>Size, USDT</Th><Th right><Term k="rr">R/R</Term></Th><Th right>Risk</Th><Th right><Term k="confidence">Conf.</Term></Th><Th>Status</Th><Th /></tr></thead>
                 <tbody className="divide-y divide-line/60">
                   {plans.map((p) => (
                     <Fragment key={p.id}>
@@ -73,7 +73,7 @@ export default function Trades() {
                         <Td right>{px(p.entry)}</Td><Td right className="text-down">{px(p.stop)}</Td><Td right className="text-up">{px(p.take_profit)}</Td>
                         <Td right>{planSize(p).value ? <>{planSize(p).value.toFixed(2)}{planSize(p).lev > 1 && <span className="block text-[11px] text-dim">{planSize(p).margin.toFixed(2)} margin</span>}</> : "–"}</Td>
                         <Td right>{p.reward_risk ?? "–"}</Td><Td right>{p.risk_amount ? Number(p.risk_amount).toFixed(2) : "–"}</Td><Td right>{p.confidence}</Td>
-                        <Td><span className={cn("rounded px-1.5 py-0.5 text-[11px] font-semibold", p.status === "proposed" ? "bg-brand-soft text-brand-strong" : p.status === "rejected" ? "bg-down/12 text-down" : "bg-sunk text-dim")}>{p.status === "proposed" ? "waiting for you" : p.status}</span></Td>
+                        <Td><span className={cn("rounded px-1.5 py-0.5 text-[11px] font-semibold", p.status === "proposed" ? "bg-brand-soft text-brand-strong" : p.status === "rejected" ? "bg-down/12 text-down" : "bg-sunk text-dim")}>{planStatus(p)}</span></Td>
                         <Td right>{p.status === "proposed" && (
                           <span className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                             <Button size="xs" className="bg-up text-white hover:bg-up/90" onClick={() => d.act(`/api/plans/${p.id}/approve`, "POST", "Sent with its stop")}>Approve</Button>
@@ -103,7 +103,7 @@ export default function Trades() {
           {positions.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
-                <thead><tr><Th>Market</Th><Th>Side</Th><Th right>Size</Th><Th right>Value</Th><Th right>Entry</Th><Th right>Mark</Th><Th right>Stop</Th><Th right>Target</Th><Th right>PnL</Th><Th>Move stop</Th><Th /></tr></thead>
+                <thead><tr><Th>Market</Th><Th>Side</Th><Th right>Size</Th><Th right>Value, USDT</Th><Th right>Entry</Th><Th right>Mark</Th><Th right>Stop</Th><Th right>Target</Th><Th right>PnL</Th><Th>Move stop</Th><Th /></tr></thead>
                 <tbody className="divide-y divide-line/60">
                   {positions.map((p) => {
                     const sg = p.side === "long" ? 1 : -1;

@@ -23,7 +23,7 @@ Every order goes out with its stop already on the exchange, so a run that fails 
 
 On spot, limit entries are sent as one OTOCO order list: the buy, and a stop-loss plus take-profit that activate when it fills. Market entries are followed by an OCO, and if that fails the coins are sold straight back. Spot is long only.
 
-On USDⓈ-M futures, entries are market orders sent when price reaches the plan's level, in isolated margin. Stop and target go out right after as `closePosition` conditional orders on mark price. If the stop can't be placed, the position is closed at once. Futures limit entries need `desk watch` running, because the desk only sees the price when it syncs.
+On USDⓈ-M futures, entries are market orders sent when price reaches the plan's level, in isolated margin. Stop and target go out right after as `closePosition` conditional orders on mark price. If the stop can't be placed, the position is closed at once. Futures limit entries wait in the desk, not on Binance, until the price gets there. `desk entries` checks them, run it every minute.
 
 Stops only move in the trade's favor, and the sync moves them for you on a winner. Once a trade is up by its original risk (1R), the stop goes to entry plus fees. From 1.5R it trails 2 ATR behind the price (4h ATR for short trades, daily for the rest) and always keeps at least half the open gain. Every move goes to the exchange as a new stop, and `[trailing]` sets the numbers or turns it off.
 
@@ -106,6 +106,7 @@ Every idea counts, taken, passed or rejected. `desk learn` replays each one on r
 | `desk execute` | Send approved plans |
 | `desk sync` | Pick up fills, stops, targets, expiries |
 | `desk watch` | Keep syncing every 5 minutes |
+| `desk entries` | Check entries waiting for a price, for a job every minute |
 | `desk status` | Equity and open positions |
 | `desk stop ID PRICE`, `close ID` | Manage a position |
 | `desk kill [--flatten]` | Cancel everything |

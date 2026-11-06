@@ -14,7 +14,7 @@ import { Prose } from "@/components/prose";
 import { Term } from "@/components/term";
 import { useTickers } from "@/components/terminal";
 import { useDeskCtx } from "@/lib/desk-context";
-import { pc, planSize, px, readAsset } from "@/lib/learn";
+import { pc, planSize, planStatus, px, readAsset } from "@/lib/learn";
 import type { Candle } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/lib/query";
@@ -323,7 +323,7 @@ export default function Markets() {
               {!plans.length && !open.length && !closed.length && <p className="text-sm text-dim">Nothing yet on {asset}.</p>}
               <ul className="space-y-2 text-[13px]">
                 {open.map((p) => <li key={`o${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> open at {px(p.entry_price)}</span><span className="font-mono text-dim">stop {px(p.stop)}, target {px(p.take_profit)}</span></li>)}
-                {plans.slice(0, 6).map((p) => <li key={`p${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> plan, {p.status}</span><span className="font-mono text-dim">{px(p.entry)} / {px(p.stop)} / {px(p.take_profit)}{planSize(p).value ? `, ${planSize(p).value.toFixed(2)} USDT` : ""}</span></li>)}
+                {plans.slice(0, 6).map((p) => <li key={`p${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> plan, {planStatus(p)}</span><span className="font-mono text-dim">{px(p.entry)} / {px(p.stop)} / {px(p.take_profit)}{planSize(p).value ? `, ${planSize(p).value.toFixed(2)} USDT` : ""}</span></li>)}
                 {closed.slice(0, 5).map((p) => <li key={`c${p.id}`} className="flex justify-between gap-2"><span>{p.side} closed, {p.exit_reason}</span><span className={cn("font-mono", p.pnl >= 0 ? "text-up" : "text-down")}>{p.pnl >= 0 ? "+" : ""}{Number(p.pnl).toFixed(2)}</span></li>)}
               </ul>
             </Box>}
