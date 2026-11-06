@@ -165,7 +165,8 @@ export function Account({ state, refresh }: { state: DeskState | null; refresh: 
   const vals = state.equity;
   const L = state.limits;
   const eq = vals.at(-1)?.value;
-  const diff = eq != null && vals[0] ? eq - vals[0].value : 0;
+  const base = state.invested ?? vals[0]?.value;
+  const diff = eq != null && base != null ? eq - base : 0;
   const data = vals.map((v) => ({ t: new Date(v.ts).toLocaleDateString([], { month: "short", day: "numeric" }), v: v.value }));
   const closePos = async (id: string, asset: string) => {
     if (!confirm(`Close ${asset} at market now?`)) return;
@@ -183,7 +184,7 @@ export function Account({ state, refresh }: { state: DeskState | null; refresh: 
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             {state.mode === "paper" ? <><Term k="paper">Pretend money</Term> on real prices · </> : null}
-            <span className={diff >= 0 ? "text-up" : "text-down"}>{money(diff)}</span> since start
+            <span className={diff >= 0 ? "text-up" : "text-down"}>{money(diff)}</span> profit on {(base ?? 0).toFixed(2)} put in
           </p>
         </CardHeader>
         <CardContent className="px-2">

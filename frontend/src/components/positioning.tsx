@@ -63,7 +63,7 @@ export function Positioning({ asset }: { asset: string }) {
       {data && !empty && (
         <div className="grid gap-px bg-line sm:grid-cols-2">
           <Panel title="Open interest" term="oi" value={data.open_interest.length ? `${usd(data.open_interest.at(-1)!.usd)} USD` : "–"} tone={oiCh == null ? "" : oiCh >= 0 ? "text-up" : "text-down"}
-            note={oiCh == null ? "No history." : `${pc(oiCh)} over this window. ${oiCh > 5 ? "New money is betting." : oiCh < -5 ? "Bets are being closed." : "Little change in open bets."}`}>
+            note={oiCh == null ? "No history." : `${pc(oiCh)} over this window.`}>
             <ChartContainer config={{ usd: { label: "Open interest", color: "var(--brand)" } }} className="aspect-auto h-full w-full">
               <LineChart data={data.open_interest} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <XAxis dataKey="t" hide /><YAxis {...axis} width={44} domain={["auto", "auto"]} tickFormatter={usd} />
@@ -73,7 +73,7 @@ export function Positioning({ asset }: { asset: string }) {
             </ChartContainer>
           </Panel>
           <Panel title="Funding" term="funding" value={fund == null ? "–" : `${fund >= 0 ? "+" : ""}${fund.toFixed(4)}%`} tone={fund == null ? "" : fund > 0.03 ? "text-warn" : fund < 0 ? "text-down" : ""}
-            note={fund == null ? "No funding history." : fund > 0.03 ? "Longs pay well above the 0.01% baseline, they are crowded." : fund < 0 ? "Shorts are paying, the crowd leans down." : "Near the 0.01% baseline, nobody is paying up."}>
+            note={fund == null ? "No funding history." : "Per 8 hours. The default is 0.01%."}>
             <ChartContainer config={{ pct: { label: "Funding", color: "var(--brand)" } }} className="aspect-auto h-full w-full">
               <BarChart data={data.funding} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <XAxis dataKey="t" hide /><YAxis {...axis} width={44} tickFormatter={(v) => `${Number(v).toFixed(3)}`} />
@@ -84,7 +84,7 @@ export function Positioning({ asset }: { asset: string }) {
             </ChartContainer>
           </Panel>
           <Panel title="Long/short ratio" term="longshort" value={acc == null ? "–" : `${acc.toFixed(2)}${top != null ? `, top ${top.toFixed(2)}` : ""}`}
-            note={acc == null ? "No history." : `Accounts ${acc > 1 ? "lean long" : "lean short"}${top != null ? `, top traders ${top > 1 ? "lean long" : "lean short"}` : ""}.${acc != null && top != null && acc > 1.5 && top < 1 ? " The crowd is long against the big accounts." : ""}`}>
+            note={acc == null ? "No history." : `All accounts${top != null ? ", and the positions of the top 20% of traders" : ""}. Above 1 means more longs.`}>
             <ChartContainer config={{ accounts: { label: "All accounts", color: "var(--brand)" }, positions: { label: "Top traders", color: "var(--ema50)" } }} className="aspect-auto h-full w-full">
               <LineChart data={ls} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <XAxis dataKey="t" hide /><YAxis {...axis} width={44} domain={["auto", "auto"]} tickFormatter={(v) => Number(v).toFixed(1)} />
@@ -96,7 +96,7 @@ export function Positioning({ asset }: { asset: string }) {
             </ChartContainer>
           </Panel>
           <Panel title="Taker buy/sell" term="taker" value={tkAvg == null ? "–" : tkAvg.toFixed(2)} tone={tkAvg == null ? "" : tkAvg >= 1 ? "text-up" : "text-down"}
-            note={tkAvg == null ? "No history." : `Average of the last ${tk.length} bars. ${tkAvg > 1.05 ? "Buyers are pushing." : tkAvg < 0.95 ? "Sellers are pushing." : "Neither side is pushing hard."}`}>
+            note={tkAvg == null ? "No history." : `Market buys against market sells, last ${tk.length} bars.`}>
             <ChartContainer config={{ ratio: { label: "Buy/sell", color: "var(--up)" } }} className="aspect-auto h-full w-full">
               <LineChart data={data.taker} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                 <XAxis dataKey="t" hide /><YAxis {...axis} width={44} domain={["auto", "auto"]} tickFormatter={(v) => Number(v).toFixed(2)} />

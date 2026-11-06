@@ -272,23 +272,21 @@ export const pc = (n: number | null | undefined, d = 1) => (n == null ? "n/a" : 
 
 // ---------- reading one asset ----------
 function trend(price: number, f: any) {
-  if (!f || f.ema20 == null || f.ema50 == null) return { dir: "none", text: "not enough data" };
+  if (!f || f.ema20 == null || f.ema50 == null) return { dir: "none", text: "no data" };
   const above = [price > f.ema20, price > f.ema50, f.ema200 == null ? null : price > f.ema200];
   const stackedUp = f.ema20 > f.ema50 && (f.ema200 == null || f.ema50 > f.ema200);
   const stackedDown = f.ema20 < f.ema50 && (f.ema200 == null || f.ema50 < f.ema200);
-  if (above.every((x) => x !== false) && stackedUp) return { dir: "up", text: "above every average, averages stacked upward" };
-  if (above.every((x) => x !== true) && stackedDown) return { dir: "down", text: "below every average, averages stacked downward" };
+  if (above.every((x) => x !== false) && stackedUp) return { dir: "up", text: "above EMA 20, 50 and 200" };
+  if (above.every((x) => x !== true) && stackedDown) return { dir: "down", text: "below EMA 20, 50 and 200" };
   const n = above.filter((x) => x === true).length;
-  return { dir: "range", text: `above ${n} of ${above.filter((x) => x !== null).length} averages, no clean stack` };
+  return { dir: "range", text: `above ${n} of ${above.filter((x) => x !== null).length} EMAs` };
 }
 
 function rsiRead(r: number | null) {
-  if (r == null) return "not in data";
-  if (r >= 70) return "overbought: buyers pushed hard, pullbacks are common from here";
-  if (r >= 55) return "buyers in control";
-  if (r > 45) return "balanced between buyers and sellers";
-  if (r > 30) return "sellers have the edge, but it isn't oversold yet (that's under 30)";
-  return "oversold: selling has been heavy. Bounces often start here, but it can stay low";
+  if (r == null) return "no data";
+  if (r >= 70) return "overbought, 70 or more";
+  if (r <= 30) return "oversold, 30 or less";
+  return "between 30 and 70";
 }
 
 function nearest(levels: any, price: number) {
@@ -300,7 +298,7 @@ function nearest(levels: any, price: number) {
 }
 
 export type Read = { key: string; label: string; value: string; text: string; term: string; tone?: string };
-export function readAsset(asset: string, f: any) {
+export function readAsset(_asset: string, f: any) {
   const price = f.price;
   const frames = f.frames || {};
   const trends = Object.fromEntries(["4h", "1d", "1w"].map((tf) => [tf, trend(price, { ...frames[tf] })]));
@@ -312,76 +310,60 @@ export function readAsset(asset: string, f: any) {
   lines.push({
     key: "trend", label: "Trend",
     value: ["4h", "1d", "1w"].map((tf) => `${tf} ${{ up: "▲", down: "▼", range: "▸", none: "·" }[trends[tf].dir as string]}`).join("  "),
-    text: `Days (4h): ${trends["4h"].text}. Weeks (1d): ${trends["1d"].text}. Months (1w): ${trends["1w"].text}.`,
+    text: `4h ${trends["4h"].text}. 1d ${trends["1d"].text}. 1w ${trends["1w"].text}.`,
     term: "ema",
   });
   if (d1.rsi != null) lines.push({
     key: "rsi", label: "RSI 1d", value: d1.rsi.toFixed(0), term: "rsi",
-    text: `${d1.rsi.toFixed(0)} is ${rsiRead(d1.rsi)}.`,
+    text: `Daily RSI 14, ${rsiRead(d1.rsi)}.`,
     tone: d1.rsi >= 55 ? "up" : d1.rsi <= 45 ? "down" : "flat",
   });
   if (d1.macd_h != null) lines.push({
     key: "macd", label: "Momentum", value: d1.macd_h >= 0 ? "rising" : "fading", term: "macd",
-    text: d1.macd_h >= 0
-      ? "The MACD histogram is positive: the short-term trend is pulling ahead of the longer one."
-      : "The MACD histogram is negative: the short-term trend is losing ground to the longer one.",
+    text: `Daily MACD histogram ${d1.macd_h >= 0 ? "above" : "below"} zero.`,
     tone: d1.macd_h >= 0 ? "up" : "down",
   });
   if (d1.atr != null) lines.push({
     key: "atr", label: "ATR 1d", value: `${d1.atr_pct.toFixed(1)}%`, term: "atr",
-    text: `On a normal day ${asset} swings about ${px(d1.atr)}. A stop closer than half of that (${px(d1.atr / 2)}) gets hit by noise, so the risk engine refuses it.`,
+    text: `Average daily range ${px(d1.atr)}. The risk engine refuses stops closer than ${px(d1.atr / 2)}.`,
   });
   if (lv.below || lv.above) lines.push({
     key: "levels", label: "Support → Res.",
     value: `${lv.below ? px(lv.below) : "?"} → ${lv.above ? px(lv.above) : "?"}`, term: "support",
     text: [
-      lv.below && `Buyers stepped in near ${px(lv.below)} before, ${((price - lv.below) / price * 100).toFixed(1)}% below now.`,
-      lv.above && `Sellers showed up near ${px(lv.above)}, ${((lv.above - price) / price * 100).toFixed(1)}% above.`,
+      lv.below && `Support ${px(lv.below)}, ${((price - lv.below) / price * 100).toFixed(1)}% below.`,
+      lv.above && `Resistance ${px(lv.above)}, ${((lv.above - price) / price * 100).toFixed(1)}% above.`,
     ].filter(Boolean).join(" "),
   });
   if (d1.vol_ratio != null) lines.push({
     key: "vol", label: "Volume", term: "volume",
     value: `${d1.vol_ratio.toFixed(1)}×`,
-    text: `Today's volume is ${d1.vol_ratio.toFixed(1)}× the 20-day average. ${d1.vol_ratio < 0.7 ? "Moves on thin volume are less trustworthy." : d1.vol_ratio > 1.5 ? "Something is going on, moves carry more weight." : "Nothing unusual."}`,
+    text: `Today's volume against the 20-day average.`,
   });
   if (der) {
     const fr = der.funding_pct;
     lines.push({
       key: "funding", label: "Funding", value: `${fr >= 0 ? "+" : ""}${fr.toFixed(4)}%`, term: "funding",
-      text: Math.abs(fr) <= 0.011
-        ? "Right at the default baseline. Futures traders aren't paying up to hold either side."
-        : fr > 0 ? "Longs are paying above baseline to stay in. The long side is getting crowded."
-          : "Shorts are paying to stay in. The short side is crowded, a squeeze up is possible.",
+      text: `Per 8 hours, ${fr >= 0 ? "longs pay shorts" : "shorts pay longs"}. The default is 0.01%.`,
       tone: Math.abs(fr) <= 0.011 ? "flat" : fr > 0 ? "warn" : "up",
     });
     const ls = der.long_short_ratio;
     lines.push({
       key: "ls", label: "Long/short", value: ls.toFixed(2), term: "longshort",
-      text: ls > 2
-        ? `${ls.toFixed(2)} accounts long for every short. The crowd is leaning up. If price dips, their exits can make the drop sharper.`
-        : ls < 0.8 ? "More accounts short than long. A rise could squeeze them out and speed it up."
-          : "Fairly balanced between longs and shorts.",
+      text: `Accounts long for each account short, Binance futures.`,
       tone: ls > 2 || ls < 0.8 ? "warn" : "flat",
     });
     const oi = der.oi_change_7d_pct;
     lines.push({
       key: "oi", label: "OI 7d", value: pc(oi, 1), term: "oi",
-      text: oi < -2 ? "Traders are closing futures bets. Less fuel for a big move either way."
-        : oi > 2 ? "New money is opening futures bets. Moves can get bigger from here."
-          : "Roughly unchanged this week.",
+      text: `Change in open futures positions over 7 days.`,
     });
   }
 
   const bias = trends["1d"].dir;
-  const headline = bias === "up"
-    ? `${asset} is trending up on the daily chart.`
-    : bias === "down" ? `${asset} is trending down on the daily chart.`
-      : `${asset} is moving sideways on the daily chart.`;
-  const tail: string[] = [];
-  if (d1.rsi != null) tail.push(d1.rsi < 45 ? "momentum is soft" : d1.rsi > 55 ? "momentum is firm" : "momentum is neutral");
-  if (der && der.long_short_ratio > 2) tail.push("and the crowd is leaning long");
+  const headline = `Daily trend ${bias === "up" ? "up" : bias === "down" ? "down" : "sideways"}${d1.rsi != null ? `, RSI ${d1.rsi.toFixed(0)}` : ""}${der ? `, long/short ${der.long_short_ratio.toFixed(2)}` : ""}.`;
   return {
-    headline: `${headline} ${tail.length ? tail.join(" ").replace(/^./, (c) => c.toUpperCase()) + "." : ""}`.trim(),
+    headline,
     trends, lines, levels: lv,
   };
 }
@@ -391,12 +373,15 @@ export function readMood(m: any) {
   const fg = m.fear_greed?.[0];
   if (!fg) return null;
   const week: number[] = m.fear_greed.map((d: any) => d.value);
-  const text = fg.value < 25 ? "Extreme fear. People are scared, and selling has been heavy."
-    : fg.value < 45 ? "Fear. The mood is cautious."
-      : fg.value <= 55 ? "Neutral."
-        : fg.value <= 75 ? "Greed. The mood is optimistic."
-          : "Extreme greed. People are euphoric, which is often when risk is highest.";
+  const text = fg.value < 25 ? "Extreme fear." : fg.value < 45 ? "Fear." : fg.value <= 55 ? "Neutral." : fg.value <= 75 ? "Greed." : "Extreme greed.";
   return { value: fg.value, label: fg.label, text, week };
+}
+
+/** What a plan puts on the table: the position's value and, on futures, the margin it ties up. */
+export function planSize(p: any) {
+  const value = Number(p.qty || 0) * Number(p.entry || 0);
+  const lev = Number(p.leverage || 1);
+  return { value, margin: lev > 1 ? value / lev : value, lev };
 }
 
 export function planStory(p: any, quote = "USDT") {
@@ -404,8 +389,10 @@ export function planStory(p: any, quote = "USDT") {
   const when = p.entry_type === "limit" ? `if price reaches ${px(p.entry)}` : `now, around ${px(p.entry)}`;
   const risk = Number(p.risk_amount || 0);
   const gain = risk && p.reward_risk ? risk * p.reward_risk : null;
+  const { value, margin, lev } = planSize(p);
+  const size = value ? ` A position worth ${value.toFixed(2)} ${quote}${lev > 1 ? `, ${margin.toFixed(2)} ${quote} of margin at ${lev}x` : ""}.` : "";
   return [
-    `${dir} ${p.asset} ${when}.`,
+    `${dir} ${p.asset} ${when}.${size}`,
     `If it goes the wrong way to ${px(p.stop)}, the exchange closes it${risk ? ` and the desk loses ${risk.toFixed(2)} ${quote}` : ""}.`,
     `If it reaches ${px(p.take_profit)}, it closes in profit${gain ? `, about ${gain.toFixed(2)} ${quote}` : ""}.`,
     p.reward_risk ? `That's ${p.reward_risk}× more upside than downside (R/R).` : "",

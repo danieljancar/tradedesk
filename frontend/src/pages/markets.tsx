@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { Crosshair, Trash2 } from "lucide-react";
+import { Crosshair, Layers, Maximize2, PanelLeft, PanelRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { usePref } from "@/lib/prefs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Box, Page } from "@/components/shell";
@@ -12,7 +14,7 @@ import { Prose } from "@/components/prose";
 import { Term } from "@/components/term";
 import { useTickers } from "@/components/terminal";
 import { useDeskCtx } from "@/lib/desk-context";
-import { pc, px, readAsset } from "@/lib/learn";
+import { pc, planSize, px, readAsset } from "@/lib/learn";
 import type { Candle } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/lib/query";
@@ -45,16 +47,6 @@ type Patterns = Record<Scale, Shape | null> & { levels: { price: number; touches
 const SOURCE: Record<string, string> = { scan: "scan pick", gold: "gold", always: "always on", core: "core holding", watchlist: "watchlist" };
 const ts = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
-function Toggle({ on, onClick, children, swatch }: { on: boolean; onClick: () => void; children: React.ReactNode; swatch?: string }) {
-  return (
-    <button type="button" aria-pressed={on} onClick={onClick}
-      className={cn("flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors",
-        on ? "border-line bg-raised text-fg" : "border-transparent text-dim hover:text-fg")}>
-      {swatch && <span className="h-0.5 w-3 rounded" style={{ background: swatch }} />}{children}
-    </button>
-  );
-}
-
 function technicalSection(body: string | null | undefined, asset: string) {
   if (!body) return null;
   const parts = body.split(/^## /m).slice(1);
@@ -67,9 +59,17 @@ export default function Markets() {
   const { asset: param } = useParams();
   const asset = (param ?? d.watch[0] ?? "BTC").toUpperCase();
   const ticks = useTickers(d.watch);
-  const [tf, setTf] = useState<(typeof TFS)[number]>("4h");
-  const [ov, setOv] = useState<Overlay>({ ema: true, volume: true, levels: true, plans: true, mine: true });
-  const [scales, setScales] = useState<Record<Scale, boolean>>({ long: true, mid: true, short: true });
+  // layout and layers are remembered in this browser
+  const [prefs, setPrefs] = usePref("markets.prefs", {
+    tf: "4h" as (typeof TFS)[number], window: "" as string, left: true, right: true,
+    ov: { ema: true, volume: true, levels: true, plans: true, mine: true } as Overlay,
+    scales: { long: true, mid: true, short: true } as Record<Scale, boolean>,
+  });
+  const { tf, ov, scales } = prefs;
+  const setTf = (x: (typeof TFS)[number]) => setPrefs({ ...prefs, tf: x, window: "" });
+  const setOv = (x: Overlay) => setPrefs({ ...prefs, ov: x });
+  const setScales = (x: Record<Scale, boolean>) => setPrefs({ ...prefs, scales: x });
+  const [fit, setFit] = useState(0);
   const index = INDEXES[asset];
   useEffect(() => { if (index && tf.endsWith("h")) setTf("1d"); }, [index, tf]);
   const pat = useApi<Patterns>(`/api/patterns/${asset}`, { stale: 900_000, every: 900_000 }).data;
@@ -82,9 +82,14 @@ export default function Markets() {
   const [range, setRange] = useState<RangeSpec | undefined>();
   const pickRange = (r: (typeof RANGES)[number]) => {
     const daily = index && (r.tf === "1h" || r.tf === "4h");
-    setTf(daily ? "1d" : r.tf);
+    setPrefs({ ...prefs, tf: daily ? "1d" : r.tf, window: r.label });
     setRange({ from: r.days == null ? null : Math.floor(Date.now() / 1000) - r.days * DAY, n: (range?.n ?? 0) + 1 });
   };
+  // the saved window comes back with the page
+  useEffect(() => {
+    const r = RANGES.find((x) => x.label === prefs.window);
+    if (r) setRange({ from: r.days == null ? null : Math.floor(Date.now() / 1000) - r.days * DAY, n: 1 });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const byAsset = Object.fromEntries(d.universe.map((u) => [u.asset, u]));
   const pick = byAsset[asset];
@@ -172,8 +177,11 @@ export default function Markets() {
 
   return (
     <Page className="max-w-none">
-      <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_340px]">
-        <Box pad={false} className="xl:self-start">
+      <div className={cn("grid gap-4",
+        prefs.left && prefs.right && "xl:grid-cols-[220px_minmax(0,1fr)_340px]",
+        prefs.left && !prefs.right && "xl:grid-cols-[220px_minmax(0,1fr)]",
+        !prefs.left && prefs.right && "xl:grid-cols-[minmax(0,1fr)_340px]")}>
+        {prefs.left && <Box pad={false} className="xl:self-start">
           <div className="flex gap-2 overflow-x-auto p-1.5 xl:block xl:space-y-2">
             <AssetGroup id="coins" title="Coins" active={asset} rows={d.watch.map((a) => {
               const k = ticks[a], u = byAsset[a];
@@ -193,7 +201,7 @@ export default function Markets() {
               };
             })} />
           </div>
-        </Box>
+        </Box>}
 
         <div className="min-w-0 space-y-4">
           <section className="overflow-hidden rounded-xl border border-line bg-panel">
@@ -235,22 +243,40 @@ export default function Markets() {
               </div>
               <div className="flex rounded-md bg-sunk p-0.5" aria-label="Time window">
                 {RANGES.filter((r) => !index || r.label !== "1W").map((r) => (
-                  <button key={r.label} type="button" onClick={() => pickRange(r)}
-                    className="h-6 rounded-[5px] px-2 text-xs font-medium text-dim hover:text-fg">{r.label}</button>
+                  <button key={r.label} type="button" onClick={() => pickRange(r)} aria-pressed={prefs.window === r.label}
+                    className={cn("h-6 rounded-[5px] px-2 text-xs font-medium", prefs.window === r.label ? "bg-raised text-fg shadow-sm" : "text-dim hover:text-fg")}>{r.label}</button>
                 ))}
               </div>
-              <span className="mx-1 h-5 w-px bg-line" />
-              <Toggle on={ov.ema} onClick={() => setOv({ ...ov, ema: !ov.ema })} swatch="var(--ema20)">EMA 20/50/200</Toggle>
-              {!index && <Toggle on={ov.volume} onClick={() => setOv({ ...ov, volume: !ov.volume })}>Volume</Toggle>}
-              {!index && <Toggle on={ov.levels} onClick={() => setOv({ ...ov, levels: !ov.levels })} swatch="var(--up)">Desk levels</Toggle>}
-              {SCALES.filter((s) => !index || s.key !== "short").map((s) => (
-                <Toggle key={s.key} on={scales[s.key]} onClick={() => setScales({ ...scales, [s.key]: !scales[s.key] })} swatch="var(--ema200)">{s.label}</Toggle>
-              ))}
-              {!index && <Toggle on={ov.plans} onClick={() => setOv({ ...ov, plans: !ov.plans })} swatch="var(--brand)">Plans &amp; trades</Toggle>}
-              <Toggle on={ov.mine} onClick={() => setOv({ ...ov, mine: !ov.mine })} swatch="var(--ema50)">My levels</Toggle>
-              <Button size="sm" variant={drawing ? "default" : "outline"} className="ml-auto h-7 gap-1.5 text-xs" onClick={() => { setDrawing(!drawing); setPending(null); }}>
-                <Crosshair className="size-3.5" />{drawing ? "Click the chart to place it" : "Draw level"}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs"><Layers className="size-3.5" />Layers</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-52">
+                  <DropdownMenuLabel>Indicators</DropdownMenuLabel>
+                  <DropdownMenuCheckboxItem checked={ov.ema} onCheckedChange={(v) => setOv({ ...ov, ema: !!v })} onSelect={(e) => e.preventDefault()}>EMA 20, 50, 200</DropdownMenuCheckboxItem>
+                  {!index && <DropdownMenuCheckboxItem checked={ov.volume} onCheckedChange={(v) => setOv({ ...ov, volume: !!v })} onSelect={(e) => e.preventDefault()}>Volume</DropdownMenuCheckboxItem>}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Patterns</DropdownMenuLabel>
+                  {SCALES.filter((x) => !index || x.key !== "short").map((x) => (
+                    <DropdownMenuCheckboxItem key={x.key} checked={scales[x.key]} onCheckedChange={(v) => setScales({ ...scales, [x.key]: !!v })} onSelect={(e) => e.preventDefault()}>{x.label} ({x.tf})</DropdownMenuCheckboxItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Levels</DropdownMenuLabel>
+                  {!index && <DropdownMenuCheckboxItem checked={ov.levels} onCheckedChange={(v) => setOv({ ...ov, levels: !!v })} onSelect={(e) => e.preventDefault()}>Desk levels</DropdownMenuCheckboxItem>}
+                  {!index && <DropdownMenuCheckboxItem checked={ov.plans} onCheckedChange={(v) => setOv({ ...ov, plans: !!v })} onSelect={(e) => e.preventDefault()}>Plans and trades</DropdownMenuCheckboxItem>}
+                  <DropdownMenuCheckboxItem checked={ov.mine} onCheckedChange={(v) => setOv({ ...ov, mine: !!v })} onSelect={(e) => e.preventDefault()}>My levels</DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => { setFit((x) => x + 1); setPrefs({ ...prefs, window: "" }); }} title="Back to the latest bars, fitted to the chart">
+                <Maximize2 className="size-3.5" />Fit
               </Button>
+              <Button size="sm" variant={drawing ? "default" : "outline"} className="h-7 gap-1.5 text-xs" onClick={() => { setDrawing(!drawing); setPending(null); }}>
+                <Crosshair className="size-3.5" />{drawing ? "Click the chart" : "Draw level"}
+              </Button>
+              <div className="ml-auto hidden gap-1 xl:flex">
+                <Button size="icon" variant={prefs.left ? "ghost" : "outline"} className="size-7" aria-label={prefs.left ? "Hide the asset list" : "Show the asset list"} onClick={() => setPrefs({ ...prefs, left: !prefs.left })}><PanelLeft className="size-3.5" /></Button>
+                <Button size="icon" variant={prefs.right ? "ghost" : "outline"} className="size-7" aria-label={prefs.right ? "Hide the side panel" : "Show the side panel"} onClick={() => setPrefs({ ...prefs, right: !prefs.right })}><PanelRight className="size-3.5" /></Button>
+              </div>
             </div>
             {pending != null && (
               <form className="flex flex-wrap items-center gap-2 border-b border-line bg-brand-soft px-3 py-2" onSubmit={(e) => { e.preventDefault(); saveLevel(); }}>
@@ -260,13 +286,13 @@ export default function Markets() {
                 <Button size="sm" type="button" variant="ghost" className="h-8" onClick={() => setPending(null)}>Cancel</Button>
               </form>
             )}
-            <div className="relative h-[56vh] min-h-[360px]">
+            <div className={cn("relative min-h-[360px]", prefs.left || prefs.right ? "h-[56vh]" : "h-[72vh]")}>
               {hover && (
                 <p className="pointer-events-none absolute top-2 left-3 z-10 font-mono text-[11px] text-dim">
                   O <span className="text-fg">{px(hover.open)}</span> H <span className="text-fg">{px(hover.high)}</span> L <span className="text-fg">{px(hover.low)}</span> C <span className="text-fg">{px(hover.close)}</span>
                 </p>
               )}
-              <MarketChart asset={asset} tf={tf} range={range} live={!index} overlay={index ? { ...ov, volume: false } : ov} lines={lines} markers={markers} segments={segments} boxes={boxes} drawing={drawing} onPick={setPending} onHover={setHover} />
+              <MarketChart asset={asset} tf={tf} range={range} fit={fit} live={!index} overlay={index ? { ...ov, volume: false } : ov} lines={lines} markers={markers} segments={segments} boxes={boxes} drawing={drawing} onPick={setPending} onHover={setHover} />
             </div>
           </section>
 
@@ -286,7 +312,7 @@ export default function Markets() {
               {!plans.length && !open.length && !closed.length && <p className="text-sm text-dim">Nothing yet on {asset}.</p>}
               <ul className="space-y-2 text-[13px]">
                 {open.map((p) => <li key={`o${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> open at {px(p.entry_price)}</span><span className="font-mono text-dim">stop {px(p.stop)}, target {px(p.take_profit)}</span></li>)}
-                {plans.slice(0, 6).map((p) => <li key={`p${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> plan, {p.status}</span><span className="font-mono text-dim">{px(p.entry)} / {px(p.stop)} / {px(p.take_profit)}</span></li>)}
+                {plans.slice(0, 6).map((p) => <li key={`p${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> plan, {p.status}</span><span className="font-mono text-dim">{px(p.entry)} / {px(p.stop)} / {px(p.take_profit)}{planSize(p).value ? `, ${planSize(p).value.toFixed(2)} USDT` : ""}</span></li>)}
                 {closed.slice(0, 5).map((p) => <li key={`c${p.id}`} className="flex justify-between gap-2"><span>{p.side} closed, {p.exit_reason}</span><span className={cn("font-mono", p.pnl >= 0 ? "text-up" : "text-down")}>{p.pnl >= 0 ? "+" : ""}{Number(p.pnl).toFixed(2)}</span></li>)}
               </ul>
             </Box>}
@@ -294,7 +320,7 @@ export default function Markets() {
           {!index && <Positioning asset={asset} />}
         </div>
 
-        <div className="space-y-4">
+        {prefs.right && <div className="space-y-4">
           {!index && <Box title={`Signals, ${asset}`} pad={false}>
             {r ? (
               <dl className="divide-y divide-line/60">
@@ -325,7 +351,7 @@ export default function Markets() {
               {!mine.length && <li className="text-xs text-dim">Use "Draw level" or add a note.</li>}
             </ul>
           </Box>
-        </div>
+        </div>}
       </div>
     </Page>
   );

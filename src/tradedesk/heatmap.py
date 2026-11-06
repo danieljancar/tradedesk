@@ -9,7 +9,7 @@ import httpx
 URL = "https://query1.finance.yahoo.com/v7/finance/spark"
 # Yahoo turns away clients without a browser user agent
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15"}
-TTL = 300
+TTL = 55
 DAY = 86_400
 HORIZONS = {"1d": 1, "1w": 7, "1m": 30}
 

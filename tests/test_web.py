@@ -32,6 +32,7 @@ def test_page_and_state_load(settings, db, market):
     assert c.get("/api/candles/DOGE").status_code == 404
     state = c.get("/api/state").json()
     assert state["mode"] == "paper"
+    assert state["invested"] == 1000
     assert state["positions"] == []
 
 

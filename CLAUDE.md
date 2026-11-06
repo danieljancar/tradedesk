@@ -16,3 +16,13 @@ A local crypto desk: whole-market scan, gold, a trading sleeve and an optional l
 ## Development
 
 `uv run pytest`, `uv run ruff check`, `uv run ruff format`. Exchange calls are tested with recorded responses in `tests/test_exchange.py`.
+
+## Writing
+
+Everything the desk writes, agent notes and dashboard text, reads like a trader's terse note, not like an assistant.
+
+- Numbers and facts only. No explaining what the reader can see, no reassurance, no "this means", no closing summary.
+- No filler sentences like "Nothing unusual", "Neither side is pushing hard", "Stock markets only move in their trading hours".
+- No hype or significance words: pivotal, crucial, robust, notably, testament, landscape.
+- No "not X, it's Y", no automatic groups of three, no rhetorical questions, at most one dash per paragraph.
+- Plain sentences with contractions. If a label and a number say it, don't add a sentence.

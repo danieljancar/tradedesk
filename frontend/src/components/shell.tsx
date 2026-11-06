@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
 import {
-  ArrowLeftRight, BookOpen, CandlestickChart, LayoutDashboard, LineChart, Menu, Moon, Newspaper, Play, RefreshCw, Settings, Sun, Users, Wallet,
+  ArrowLeftRight, BookOpen, CandlestickChart, ChevronDown, LayoutDashboard, LineChart, Menu, Moon, Newspaper, Play, RefreshCw, Settings, Sun, Users, Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -39,8 +39,9 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
   const live = latest?.status === "running" || !!d.state?.busy;
   const lastAt = useClock(latest?.started_at);
   const eq = d.state?.equity.at(-1)?.value;
-  const first = d.state?.equity[0]?.value;
-  const pnl = eq != null && first != null ? eq - first : 0;
+  // profit counts against the money put in, so a deposit doesn't show up as a gain
+  const base = d.state?.invested ?? d.state?.equity[0]?.value;
+  const pnl = eq != null && base != null ? eq - base : 0;
   const waiting = d.state?.plans.filter((p) => p.status === "proposed").length ?? 0;
   const regime = d.macro?.regime;
   const title = NAV.find((n) => (n.end ? loc.pathname === n.to : loc.pathname.startsWith(n.to)))?.label ?? "";
@@ -73,7 +74,7 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
           <div className="rounded-md bg-sunk px-3 py-2">
             <p className="text-[11px] text-dim">Equity</p>
             <p className="font-mono text-lg leading-tight tabular-nums">{eq == null ? "–" : px(eq)} <span className="text-xs text-dim">{d.state?.quote}</span></p>
-            <p className={cn("font-mono text-[11px] tabular-nums", pnl >= 0 ? "text-up" : "text-down")}>{pnl >= 0 ? "+" : "−"}{Math.abs(pnl).toFixed(2)} since start</p>
+            <p className={cn("font-mono text-[11px] tabular-nums", pnl >= 0 ? "text-up" : "text-down")}>{pnl >= 0 ? "+" : "−"}{Math.abs(pnl).toFixed(2)} profit{base != null && d.state?.invested != null ? `, ${px(base)} put in` : ""}</p>
           </div>
           <p className="px-1 text-[11px] text-dim">{d.state?.auto_execute ? "Auto-execute on" : "Manual approval"}</p>
         </div>
@@ -162,16 +163,35 @@ export function Page({ children, className }: { children: ReactNode; className?:
   return <div className={cn("mx-auto w-full max-w-[1600px] space-y-4 p-3 sm:p-5", className)}>{children}</div>;
 }
 
-export function Box({ title, right, children, className, pad = true }: { title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; pad?: boolean }) {
+function useFolded(key: string | null) {
+  const read = () => { try { return key ? localStorage.getItem(`fold.${key}`) === "1" : false; } catch { return false; } };
+  const [folded, setFolded] = useState(read);
+  const toggle = () => {
+    setFolded(!folded);
+    try { if (key) localStorage.setItem(`fold.${key}`, folded ? "0" : "1"); } catch { /* storage blocked */ }
+  };
+  return [folded, toggle] as const;
+}
+
+/** A panel. Any panel with a title folds up from its header, and stays folded in this browser. */
+export function Box({ title, right, children, className, pad = true, fold }: { title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; pad?: boolean; fold?: string }) {
+  const { pathname } = useLocation();
+  // "Signals, BTC" and "Signals, ETH" fold together
+  const key = fold ?? (typeof title === "string" ? `${pathname.split("/")[1] || "home"}.${title.split(",")[0]}` : null);
+  const [folded, toggle] = useFolded(key);
   return (
     <section className={cn("overflow-hidden rounded-xl border border-line bg-panel", className)}>
       {title != null && (
-        <header className="flex min-h-11 items-center gap-2 border-b border-line px-4 py-2">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <div className="ml-auto flex items-center gap-2">{right}</div>
+        <header className={cn("flex min-h-11 items-center gap-2 px-4 py-2", !folded && "border-b border-line")}>
+          {key ? (
+            <button type="button" onClick={toggle} aria-expanded={!folded} className="-ml-1 flex items-center gap-1.5 rounded px-1 text-left text-sm font-semibold hover:text-fg">
+              <ChevronDown className={cn("size-3.5 shrink-0 text-dim transition-transform", folded && "-rotate-90")} />{title}
+            </button>
+          ) : <h2 className="text-sm font-semibold">{title}</h2>}
+          {!folded && <div className="ml-auto flex items-center gap-2">{right}</div>}
         </header>
       )}
-      <div className={pad ? "p-4" : ""}>{children}</div>
+      {!folded && <div className={pad ? "p-4" : ""}>{children}</div>}
     </section>
   );
 }

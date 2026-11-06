@@ -244,6 +244,19 @@ def create_app(desk: Desk) -> FastAPI:
         cfg = Path(os.environ.get("DESK_CONFIG", "desk.toml")).stem
         return (ROOT / "data" / "logs" / f"{cfg}.lock").is_dir()
 
+    def invested() -> float | None:
+        """Money put in, deposits and withdrawals included, so profit isn't confused with deposits.
+        Transfers between spot and futures cancel out across the two desks."""
+        total = 0.0
+        for d, _ in desks:
+            base = d.principal()
+            if base is None:
+                if d.settings.mode != "paper":
+                    return None
+                base = d.settings.paper_equity + d.db.net_flows()
+            total += base
+        return total
+
     @app.get("/api/state")
     def state() -> dict:
         positions = tagged("SELECT * FROM positions WHERE status = 'open' ORDER BY opened_at")
@@ -256,6 +269,7 @@ def create_app(desk: Desk) -> FastAPI:
         return {
             "mode": desk.settings.mode,
             "busy": starting(),
+            "invested": invested(),
             "market": desk.settings.market,
             "venues": [d.settings.market.value for d, _ in desks],
             "peer": desk.settings.peer_dashboard or None,
