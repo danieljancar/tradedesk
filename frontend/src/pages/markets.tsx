@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useNavigate, useParams } from "react-router";
+import { useParams } from "react-router";
 import { Crosshair, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Box, Page } from "@/components/shell";
-import { MarketChart, cssColor, type BoxSpec, type LineSpec, type MarkerSpec, type Overlay, type SegmentSpec } from "@/components/market-chart";
+import { AssetGroup } from "@/components/asset-list";
+import { MarketChart, cssColor, type RangeSpec, type BoxSpec, type LineSpec, type MarkerSpec, type Overlay, type SegmentSpec } from "@/components/market-chart";
 import { Positioning } from "@/components/positioning";
 import { Prose } from "@/components/prose";
 import { Term } from "@/components/term";
@@ -16,7 +17,18 @@ import type { Candle } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/lib/query";
 
-const TFS = ["1h", "4h", "1d", "1w"] as const;
+const TFS = ["1h", "4h", "1d", "1w", "1M"] as const;
+const TF_LABEL: Record<string, string> = { "1M": "1mo" };
+const DAY = 86_400;
+// each window picks a bar size that fits it, like TradingView's range buttons
+const RANGES: { label: string; days: number | null; tf: (typeof TFS)[number] }[] = [
+  { label: "1W", days: 7, tf: "1h" },
+  { label: "1M", days: 30, tf: "4h" },
+  { label: "3M", days: 91, tf: "4h" },
+  { label: "1Y", days: 365, tf: "1d" },
+  { label: "5Y", days: 5 * 365, tf: "1w" },
+  { label: "All", days: null, tf: "1M" },
+];
 // charted from FRED daily closes, so only daily and weekly bars
 const INDEXES: Record<string, { name: string; driver: string }> = {
   SPX: { name: "S&P 500", driver: "SP500" },
@@ -30,7 +42,7 @@ const SCALES: { key: Scale; label: string; tf: string; width: 1 | 2 | 3; style: 
 ];
 type Shape = { pattern: string; position: string; tf: string; upper: { t1: number; p1: number; t_end: number; p_end: number }; lower: { t1: number; p1: number; t_end: number; p_end: number } };
 type Patterns = Record<Scale, Shape | null> & { levels: { price: number; touches: number; since: number; kind: "support" | "resistance" }[] };
-const SOURCE: Record<string, string> = { scan: "found by the scan", gold: "gold", always: "always watched", core: "core holding", watchlist: "watchlist" };
+const SOURCE: Record<string, string> = { scan: "scan pick", gold: "gold", always: "always on", core: "core holding", watchlist: "watchlist" };
 const ts = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
 function Toggle({ on, onClick, children, swatch }: { on: boolean; onClick: () => void; children: React.ReactNode; swatch?: string }) {
@@ -52,7 +64,6 @@ function technicalSection(body: string | null | undefined, asset: string) {
 
 export default function Markets() {
   const d = useDeskCtx();
-  const nav = useNavigate();
   const { asset: param } = useParams();
   const asset = (param ?? d.watch[0] ?? "BTC").toUpperCase();
   const ticks = useTickers(d.watch);
@@ -60,7 +71,7 @@ export default function Markets() {
   const [ov, setOv] = useState<Overlay>({ ema: true, volume: true, levels: true, plans: true, mine: true });
   const [scales, setScales] = useState<Record<Scale, boolean>>({ long: true, mid: true, short: true });
   const index = INDEXES[asset];
-  useEffect(() => { if (index && (tf === "1h" || tf === "4h")) setTf("1d"); }, [index, tf]);
+  useEffect(() => { if (index && tf.endsWith("h")) setTf("1d"); }, [index, tf]);
   const pat = useApi<Patterns>(`/api/patterns/${asset}`, { stale: 900_000, every: 900_000 }).data;
   const driver = index ? d.macro?.drivers?.find((x: any) => x.id === index.driver) : null;
   const [drawing, setDrawing] = useState(false);
@@ -68,9 +79,14 @@ export default function Markets() {
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [hover, setHover] = useState<Candle | null>(null);
+  const [range, setRange] = useState<RangeSpec | undefined>();
+  const pickRange = (r: (typeof RANGES)[number]) => {
+    const daily = index && (r.tf === "1h" || r.tf === "4h");
+    setTf(daily ? "1d" : r.tf);
+    setRange({ from: r.days == null ? null : Math.floor(Date.now() / 1000) - r.days * DAY, n: (range?.n ?? 0) + 1 });
+  };
 
   const byAsset = Object.fromEntries(d.universe.map((u) => [u.asset, u]));
-  const found = d.universe.filter((u) => u.source === "scan").length;
   const pick = byAsset[asset];
   const f = d.facts?.[asset];
   const r = f?.frames ? readAsset(asset, f) : null;
@@ -118,7 +134,7 @@ export default function Markets() {
     const c = cssColor("--ema200");
     // short-term lines only make sense on the short charts
     return shapes
-      .filter((s) => scales[s.key] && !(s.key === "short" && (tf === "1d" || tf === "1w")))
+      .filter((s) => scales[s.key] && !(s.key === "short" && !tf.endsWith("h")))
       .flatMap((s) => (["upper", "lower"] as const).map((k) => ({
         t1: s.shape![k].t1, p1: s.shape![k].p1, t2: s.shape![k].t_end, p2: s.shape![k].p_end,
         color: c, width: s.width, style: s.style, extend: true,
@@ -157,42 +173,26 @@ export default function Markets() {
   return (
     <Page className="max-w-none">
       <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_340px]">
-        <Box title="Today's assets" right={found > 0 && <span className="text-xs text-dim">{found} from the scan</span>} pad={false} className="xl:self-start">
-          <ul className="flex gap-1 overflow-x-auto p-1.5 xl:block xl:space-y-0.5">
-            {d.watch.map((a) => {
-              const k = ticks[a];
-              const u = byAsset[a];
-              return (
-                <li key={a} className="shrink-0">
-                  <NavLink to={`/markets/${a}`} title={u?.reason ?? undefined} className={({ isActive }) => cn("flex items-center justify-between gap-3 rounded-md px-2.5 py-2 hover:bg-raised", (isActive || (!param && a === asset)) && "bg-raised")}>
-                    <span>
-                      <span className="block font-semibold">{a}</span>
-                      {u && u.source !== "watchlist" && <span className="block text-[10px] font-medium text-dim">{SOURCE[u.source]}</span>}
-                    </span>
-                    <span className="text-right">
-                      <span className="block font-mono text-[13px] tabular-nums">{k ? px(k.price) : "–"}</span>
-                      <span className={cn("block font-mono text-[11px] tabular-nums", k && (k.ch >= 0 ? "text-up" : "text-down"))}>{k ? pc(k.ch, 2) : ""}</span>
-                    </span>
-                  </NavLink>
-                </li>
-              );
-            })}
-            <li className="hidden px-2.5 pt-3 pb-1 text-[11px] font-semibold tracking-[0.08em] text-dim uppercase xl:block">Indexes</li>
-            {Object.entries(INDEXES).map(([k, ix]) => {
+        <Box pad={false} className="xl:self-start">
+          <div className="flex gap-2 overflow-x-auto p-1.5 xl:block xl:space-y-2">
+            <AssetGroup id="coins" title="Coins" active={asset} rows={d.watch.map((a) => {
+              const k = ticks[a], u = byAsset[a];
+              return {
+                id: a, label: a, title: u?.reason ?? undefined,
+                sub: u && u.source !== "watchlist" ? SOURCE[u.source] : undefined,
+                value: k ? px(k.price) : undefined,
+                change: k && <span className={cn("block font-mono text-[11px] tabular-nums", k.ch >= 0 ? "text-up" : "text-down")}>{pc(k.ch, 2)}</span>,
+              };
+            })} />
+            <AssetGroup id="indexes" title="Indexes" active={asset} rows={Object.entries(INDEXES).map(([k, ix]) => {
               const dr = d.macro?.drivers?.find((x: any) => x.id === ix.driver);
-              return (
-                <li key={k} className="shrink-0">
-                  <NavLink to={`/markets/${k}`} className={({ isActive }) => cn("flex items-center justify-between gap-3 rounded-md px-2.5 py-2 hover:bg-raised", isActive && "bg-raised")}>
-                    <span className="block font-semibold">{ix.name}</span>
-                    <span className="text-right">
-                      <span className="block font-mono text-[13px] tabular-nums">{dr?.value != null ? px(dr.value) : "–"}</span>
-                      <span className={cn("block font-mono text-[11px] tabular-nums", dr?.change_1w != null && (dr.change_1w >= 0 ? "text-up" : "text-down"))}>{dr?.change_1w != null ? `${pc(dr.change_1w, 2)} 1w` : ""}</span>
-                    </span>
-                  </NavLink>
-                </li>
-              );
-            })}
-          </ul>
+              return {
+                id: k, label: ix.name,
+                value: dr?.value != null ? px(dr.value) : undefined,
+                change: dr?.change_1w != null && <span className={cn("block font-mono text-[11px] tabular-nums", dr.change_1w >= 0 ? "text-up" : "text-down")}>{pc(dr.change_1w, 2)} 1w</span>,
+              };
+            })} />
+          </div>
         </Box>
 
         <div className="min-w-0 space-y-4">
@@ -225,17 +225,18 @@ export default function Markets() {
               {pick?.reason && pick.source === "scan" && (
               <p className="w-full rounded-md bg-brand-soft px-3 py-1.5 text-[13px] text-brand-strong">Picked by the scan: {pick.reason}</p>
             )}
-            {hover && (
-                <p className="ml-auto font-mono text-[11px] text-dim">
-                  O <span className="text-fg">{px(hover.open)}</span> H <span className="text-fg">{px(hover.high)}</span> L <span className="text-fg">{px(hover.low)}</span> C <span className="text-fg">{px(hover.close)}</span>
-                </p>
-              )}
             </header>
             <div className="flex flex-wrap items-center gap-1.5 border-b border-line px-3 py-2">
               <div className="flex rounded-md bg-sunk p-0.5">
-                {TFS.filter((x) => !index || x === "1d" || x === "1w").map((x) => (
+                {TFS.filter((x) => !index || !x.endsWith("h")).map((x) => (
                   <button key={x} type="button" onClick={() => setTf(x)} aria-pressed={tf === x}
-                    className={cn("h-6 rounded-[5px] px-2.5 text-xs font-medium", tf === x ? "bg-raised text-fg shadow-sm" : "text-dim hover:text-fg")}>{x}</button>
+                    className={cn("h-6 rounded-[5px] px-2.5 text-xs font-medium", tf === x ? "bg-raised text-fg shadow-sm" : "text-dim hover:text-fg")}>{TF_LABEL[x] ?? x}</button>
+                ))}
+              </div>
+              <div className="flex rounded-md bg-sunk p-0.5" aria-label="Time window">
+                {RANGES.filter((r) => !index || r.label !== "1W").map((r) => (
+                  <button key={r.label} type="button" onClick={() => pickRange(r)}
+                    className="h-6 rounded-[5px] px-2 text-xs font-medium text-dim hover:text-fg">{r.label}</button>
                 ))}
               </div>
               <span className="mx-1 h-5 w-px bg-line" />
@@ -259,8 +260,13 @@ export default function Markets() {
                 <Button size="sm" type="button" variant="ghost" className="h-8" onClick={() => setPending(null)}>Cancel</Button>
               </form>
             )}
-            <div className="h-[56vh] min-h-[360px]">
-              <MarketChart asset={asset} tf={tf} overlay={index ? { ...ov, volume: false } : ov} lines={lines} markers={markers} segments={segments} boxes={boxes} drawing={drawing} onPick={setPending} onHover={setHover} />
+            <div className="relative h-[56vh] min-h-[360px]">
+              {hover && (
+                <p className="pointer-events-none absolute top-2 left-3 z-10 font-mono text-[11px] text-dim">
+                  O <span className="text-fg">{px(hover.open)}</span> H <span className="text-fg">{px(hover.high)}</span> L <span className="text-fg">{px(hover.low)}</span> C <span className="text-fg">{px(hover.close)}</span>
+                </p>
+              )}
+              <MarketChart asset={asset} tf={tf} range={range} live={!index} overlay={index ? { ...ov, volume: false } : ov} lines={lines} markers={markers} segments={segments} boxes={boxes} drawing={drawing} onPick={setPending} onHover={setHover} />
             </div>
           </section>
 
@@ -319,7 +325,6 @@ export default function Markets() {
               {!mine.length && <li className="text-xs text-dim">Use "Draw level" or add a note.</li>}
             </ul>
           </Box>
-          <p className="px-1 text-[11px] text-dim">Switch coin: {d.watch.filter((a) => a !== asset).map((a) => <button key={a} className="mr-2 underline-offset-2 hover:underline" onClick={() => nav(`/markets/${a}`)}>{a}</button>)}</p>
         </div>
       </div>
     </Page>

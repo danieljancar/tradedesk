@@ -33,7 +33,7 @@ from tradedesk.replay import replay
 
 HERE = Path(__file__).parent
 DIST = HERE / "dist"
-TIMEFRAMES = {"1h", "4h", "1d", "1w"}
+TIMEFRAMES = {"1h", "4h", "1d", "1w", "1M"}
 NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>tradedesk · Trading floor</title>
 <p>The dashboard isn't built. Run <code>cd frontend && pnpm install && pnpm build</code>.</p>"""
 md = MarkdownIt("commonmark", {"html": False, "linkify": False}).enable("table")
@@ -66,26 +66,30 @@ def create_app(desk: Desk) -> FastAPI:
         page = DIST / "index.html"
         return page.read_text() if page.exists() else NOT_BUILT
 
-    def bars(asset: str, tf: str, limit: int) -> list:
+    def bars(asset: str, tf: str, limit: int, end: int | None = None) -> list:
         asset = asset.upper()
         index = asset in macro.INDEXES
         known = {*desk.settings.watchlist, "BTC", "ETH", *(a["asset"] for a in desk.run_assets())}
         if (
             tf not in TIMEFRAMES
             or not (index or asset in known)
-            or (index and tf not in ("1d", "1w"))
+            or (index and tf not in ("1d", "1w", "1M"))
         ):
             raise HTTPException(404, "unknown asset or timeframe")
-        limit = max(10, min(limit, 500))
-        key = (asset, tf, limit)
+        limit = max(10, min(limit, 1000))
+        key = (asset, tf, limit, end)
         hit = cache.get(key)
         if hit and time.monotonic() - hit[0] < 60:
             return hit[1]
         try:
             if index:
-                rows = macro.index_candles(asset, tf, limit)
+                rows = macro.index_candles(asset, tf, limit, end)
             else:
-                rows = market_data(desk.settings).klines(desk.settings.symbol(asset), tf, limit)
+                md, symbol = market_data(desk.settings), desk.settings.symbol(asset)
+                if end:
+                    rows = md.klines(symbol, tf, limit, end_ms=end)
+                else:
+                    rows = md.klines(symbol, tf, limit)
         except Exception as e:
             source = "FRED" if index else "Binance"
             raise HTTPException(502, f"{source} did not answer: {e}") from e
@@ -93,7 +97,8 @@ def create_app(desk: Desk) -> FastAPI:
         return rows
 
     @app.get("/api/candles/{asset}")
-    def candles(asset: str, tf: str = "1d", limit: int = 200) -> list[dict]:
+    def candles(asset: str, tf: str = "1d", limit: int = 200, end: int | None = None) -> list[dict]:
+        """`end` in ms returns the bars up to that time, for loading history on scroll."""
         return [
             {
                 "time": c.open_time // 1000,
@@ -103,7 +108,7 @@ def create_app(desk: Desk) -> FastAPI:
                 "close": c.close,
                 "volume": c.volume,
             }
-            for c in bars(asset, tf, limit)
+            for c in bars(asset, tf, limit, end)
         ]
 
     @app.get("/api/patterns/{asset}")

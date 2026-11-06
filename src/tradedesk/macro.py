@@ -184,10 +184,11 @@ PATTERNED = {"SP500", "NASDAQCOM"}
 INDEXES = {"SPX": "SP500", "NDX": "NASDAQCOM"}
 
 
-def index_candles(name: str, tf: str, limit: int) -> list[Candle]:
-    """FRED only has closes, so each bar opens at the previous close."""
-    days = limit * (7 if tf == "1w" else 1.5) + 14
-    points = _cached(f"fred:{name}:{int(days)}", 3600, lambda: fred(INDEXES[name], int(days)))
+def index_candles(name: str, tf: str, limit: int, end_ms: int | None = None) -> list[Candle]:
+    """Daily, weekly or monthly bars from FRED's full history. FRED only has closes, so each
+    bar opens at the previous close. `end_ms` pages back for older bars."""
+    years = 60
+    points = _cached(f"fred:{name}", 6 * 3600, lambda: fred(INDEXES[name], 366 * years))
     if not points:
         raise RuntimeError("FRED did not answer")
     bars: list[Candle] = []
@@ -196,6 +197,8 @@ def index_candles(name: str, tf: str, limit: int) -> list[Candle]:
         day = datetime.fromisoformat(d).replace(tzinfo=UTC)
         if tf == "1w":
             day -= timedelta(days=day.weekday())
+        elif tf == "1M":
+            day = day.replace(day=1)
         t = int(day.timestamp() * 1000)
         if bars and bars[-1].open_time == t:
             b = bars[-1]
@@ -203,6 +206,8 @@ def index_candles(name: str, tf: str, limit: int) -> list[Candle]:
         else:
             bars.append(Candle(t, prev, max(prev, v), min(prev, v), v, 0))
         prev = v
+    if end_ms is not None:
+        bars = [b for b in bars if b.open_time <= end_ms]
     return bars[-limit:]
 
 

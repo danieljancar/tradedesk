@@ -86,3 +86,19 @@ def test_index_candles_and_patterns(settings, db, market, monkeypatch):
     shape = c.get("/api/patterns/SPX").json()
     assert shape["short"] is None
     assert set(shape) == {"short", "mid", "long", "levels"}
+
+
+def test_index_pages_back_and_monthly(settings, db, market, monkeypatch):
+    from tradedesk import macro
+
+    macro._cache.clear()
+    # 25 trading days a month, ten years
+    day = lambda i: f"20{10 + i // 300}-{1 + (i // 25) % 12:02d}-{1 + i % 25:02d}"  # noqa: E731
+    days = [(day(i), 100 + i) for i in range(3000)]
+    monkeypatch.setattr("tradedesk.macro.fred", lambda sid, days_back: days)
+    c, _ = client(settings, db, market)
+    last = c.get("/api/candles/NDX?tf=1d&limit=50").json()
+    older = c.get(f"/api/candles/NDX?tf=1d&limit=50&end={last[0]['time'] * 1000 - 1}").json()
+    assert older[-1]["time"] < last[0]["time"] and len(older) == 50
+    months = c.get("/api/candles/NDX?tf=1M&limit=1000").json()
+    assert 100 < len(months) < 200

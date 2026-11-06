@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineStyle, createChart, createSeriesMarkers,
   type IChartApi, type ISeriesApi, type SeriesMarker, type UTCTimestamp,
 } from "lightweight-charts";
-import { type Candle } from "@/lib/api";
+import { api, type Candle } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/lib/query";
 
@@ -32,11 +32,13 @@ export type Overlay = { ema: boolean; volume: boolean; levels: boolean; plans: b
 export type SegmentSpec = { t1: number; p1: number; t2: number; p2: number; color: string; width?: 1 | 2 | 3; style?: "solid" | "dashed" | "dotted"; extend?: boolean };
 export type BoxSpec = { from: number; entry: number; stop: number; target: number; up: string; down: string };
 export type LineSpec = { price: number; title: string; color: string; style?: "solid" | "dashed" | "dotted"; width?: 1 | 2 | 3 };
+/** A time window to show, `from` in seconds, null for all history. `n` changes on every click. */
+export type RangeSpec = { from: number | null; n: number };
 export type MarkerSpec = { time: number; text: string; color: string; position: "aboveBar" | "belowBar"; shape: "arrowUp" | "arrowDown" | "circle" };
 
-export function MarketChart({ asset, tf, overlay, lines, markers, segments = [], boxes = [], drawing, onPick, onHover }: {
+export function MarketChart({ asset, tf, overlay, lines, markers, segments = [], boxes = [], drawing, onPick, onHover, range, live = true }: {
   asset: string; tf: string; overlay: Overlay; lines: LineSpec[]; markers: MarkerSpec[]; segments?: SegmentSpec[]; boxes?: BoxSpec[];
-  drawing: boolean; onPick: (price: number) => void; onHover?: (c: Candle | null) => void;
+  drawing: boolean; onPick: (price: number) => void; onHover?: (c: Candle | null) => void; range?: RangeSpec; live?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const paint = useRef<HTMLCanvasElement>(null);
@@ -46,10 +48,41 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
   pickRef.current = onPick;
   const drawRef = useRef(drawing);
   drawRef.current = drawing;
-  const limit = tf === "1h" || tf === "4h" ? 400 : tf === "1d" ? 365 : 500;
-  const candles = useApi<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=${limit}`, { every: 60_000 });
-  const data = candles.data ?? null;
-  const err = candles.data ? null : (candles.error?.message ?? null);
+  const limit = tf === "1h" || tf === "4h" ? 500 : 1000;
+  const q = useApi<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=${limit}`, { every: 60_000 });
+  const err = q.data ? null : (q.error?.message ?? null);
+
+  // older bars load in pages when you scroll to the left edge, like on TradingView
+  const key = `${asset}:${tf}`;
+  const [older, setOlder] = useState<{ key: string; bars: Candle[] }>({ key, bars: [] });
+  const done = useRef(new Set<string>());
+  const loading = useRef(false);
+  const data = useMemo(() => {
+    const fresh = q.data;
+    if (!fresh?.length) return fresh ?? null;
+    if (older.key !== key || !older.bars.length) return fresh;
+    return [...older.bars.filter((c) => c.time < fresh[0].time), ...fresh];
+  }, [q.data, older, key]);
+  const loadOlder = useRef(async () => {});
+  loadOlder.current = async () => {
+    if (!data?.length || loading.current || done.current.has(key)) return;
+    loading.current = true;
+    try {
+      const got = await api<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=1000&end=${data[0].time * 1000 - 1}`);
+      const fresh = got.filter((c) => c.time < data[0].time);
+      if (fresh.length < 2) done.current.add(key);
+      else setOlder((o) => ({ key, bars: [...fresh, ...(o.key === key ? o.bars : [])] }));
+    } catch {
+      done.current.add(key);
+    } finally {
+      loading.current = false;
+    }
+  };
+  // what was on screen, so a refresh or a new page of history doesn't throw the view back
+  const view = useRef<{ key: string; from: number; to: number; width: number; end: boolean } | null>(null);
+  const want = useRef<RangeSpec | null>(null);
+  const [ask, setAsk] = useState(0);
+  useEffect(() => { if (range) { want.current = range; setAsk((x) => x + 1); } }, [range?.n]);
   const [scheme, setScheme] = useState(0);
 
   useEffect(() => {
@@ -144,18 +177,35 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
       if (price != null) pickRef.current(Number(price));
     });
     if (onHover) {
+      // the legend shows the last bar until the mouse points at another one, like TradingView
+      const latest = data[data.length - 1];
+      onHover(latest);
       chart.subscribeCrosshairMove((param) => {
-        if (!param.time) return onHover(null);
-        const c = data.find((x) => x.time === param.time);
-        onHover(c ?? null);
+        const c = param.time ? data.find((x) => x.time === param.time) : null;
+        onHover(c ?? latest);
       });
     }
-    const span = tf === "1w" ? 120 : tf === "1d" ? 150 : 180;
-    chart.timeScale().setVisibleLogicalRange({ from: data.length - span, to: data.length + 5 });
+    const ts = chart.timeScale();
+    const v = view.current?.key === key ? view.current : null;
+    const goal = want.current;
+    if (goal) {
+      const from = goal.from ?? 0;
+      if (data[0].time > from && !done.current.has(key)) loadOlder.current();
+      else want.current = null;
+      ts.setVisibleRange({ from: Math.max(from, data[0].time) as UTCTimestamp, to: data[data.length - 1].time as UTCTimestamp });
+    } else if (v?.end) {
+      ts.setVisibleLogicalRange({ from: data.length - v.width, to: data.length + 5 });
+    } else if (v) {
+      ts.setVisibleRange({ from: v.from as UTCTimestamp, to: v.to as UTCTimestamp });
+    } else {
+      const span = tf === "1M" ? 80 : tf === "1w" ? 120 : tf === "1d" ? 150 : 180;
+      ts.setVisibleLogicalRange({ from: data.length - span, to: data.length + 5 });
+    }
+    ts.subscribeVisibleLogicalRangeChange((r) => { if (r && r.from < 30) loadOlder.current(); });
     // the forming candle ticks live from Binance's public stream; the 60s refetch fills any gap
     const us = cssColor("--up", 0.35), ds = cssColor("--down", 0.35);
-    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${asset.toLowerCase()}usdt@kline_${tf}`);
-    ws.onmessage = (ev) => {
+    const ws = live ? new WebSocket(`wss://stream.binance.com:9443/ws/${asset.toLowerCase()}usdt@kline_${tf}`) : null;
+    if (ws) ws.onmessage = (ev) => {
       const k = JSON.parse(ev.data)?.k;
       if (!k) return;
       const time = Math.floor(k.t / 1000) as UTCTimestamp;
@@ -164,9 +214,13 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
       candles.update(bar);
       vol?.update({ time, value: +k.v, color: bar.close >= bar.open ? us : ds });
     };
-    return () => { cancelAnimationFrame(frame); paint.current?.getContext("2d")?.clearRect(0, 0, 1e5, 1e5); ws.close(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
+    return () => {
+      const r = ts.getVisibleRange(), lr = ts.getVisibleLogicalRange();
+      view.current = r && lr ? { key, from: r.from as number, to: r.to as number, width: lr.to - lr.from, end: lr.to >= data.length - 1 } : null;
+      cancelAnimationFrame(frame); paint.current?.getContext("2d")?.clearRect(0, 0, 1e5, 1e5); ws?.close(); chart.remove(); chartRef.current = null; seriesRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, tf, overlay.ema, overlay.volume, JSON.stringify(lines), JSON.stringify(markers), JSON.stringify(segments), JSON.stringify(boxes), scheme]);
+  }, [data, tf, ask, overlay.ema, overlay.volume, JSON.stringify(lines), JSON.stringify(markers), JSON.stringify(segments), JSON.stringify(boxes), scheme]);
 
   if (err) return <p className="grid h-full place-items-center text-sm text-dim">Couldn't load candles: {err}</p>;
   return (

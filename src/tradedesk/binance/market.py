@@ -59,11 +59,21 @@ class MarketData:
         return self.spot if self.market is Market.SPOT else self.futures
 
     def klines(
-        self, symbol: str, interval: str, limit: int = 200, start_ms: int | None = None
+        self,
+        symbol: str,
+        interval: str,
+        limit: int = 200,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
     ) -> list[Candle]:
         path = "/api/v3/klines" if self.market is Market.SPOT else "/fapi/v1/klines"
         rows = self.trading.public(
-            path, symbol=symbol, interval=interval, limit=limit, startTime=start_ms
+            path,
+            symbol=symbol,
+            interval=interval,
+            limit=limit,
+            startTime=start_ms,
+            endTime=end_ms,
         )
         return [Candle.from_binance(r) for r in rows]
 
