@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Box, Page } from "@/components/shell";
 import { Compare, DriverCard, FearGreed, IndexPattern, big, type Driver } from "@/components/overview";
+import { Heatmap } from "@/components/heatmap";
 import { Avatar } from "@/components/panels";
 import { Prose } from "@/components/prose";
 import { useDeskCtx } from "@/lib/desk-context";
@@ -65,6 +66,8 @@ export default function Overview() {
             {drivers.map((x) => <DriverCard key={x.id} d={x} />)}
             {!drivers.length && <div className="h-40 animate-pulse bg-panel sm:col-span-2 lg:col-span-3" />}
           </section>
+
+          <Heatmap />
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <Box title="Bitcoin against the S&P 500" right={<span className="text-xs text-dim">90 days, indexed to 100</span>} pad={false}>

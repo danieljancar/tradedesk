@@ -15,6 +15,7 @@ from markdown_it import MarkdownIt
 from tradedesk import (
     analytics,
     ask,
+    heatmap,
     learning,
     macro,
     notes,
@@ -451,6 +452,13 @@ def create_app(desk: Desk) -> FastAPI:
         if rows is None:
             raise HTTPException(502, "CoinGecko did not answer")
         return rows
+
+    @app.get("/api/heatmap")
+    def market_heatmap() -> dict:
+        try:
+            return heatmap.board()
+        except RuntimeError as e:
+            raise HTTPException(502, str(e)) from e
 
     @app.get("/api/analytics")
     def analytics_report() -> dict:
