@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { Crosshair, Layers, Maximize2, PanelLeft, PanelRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Crosshair, Layers, Maximize2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePref } from "@/lib/prefs";
@@ -46,6 +46,18 @@ type Shape = { pattern: string; position: string; tf: string; upper: { t1: numbe
 type Patterns = Record<Scale, Shape | null> & { levels: { price: number; touches: number; since: number; kind: "support" | "resistance" }[] };
 const SOURCE: Record<string, string> = { scan: "scan pick", gold: "gold", always: "always on", core: "core holding", watchlist: "watchlist" };
 const ts = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+
+/** Half-round tab on the edge of the chart column that hides or shows the panel beside it. */
+function Edge({ side, open, onClick }: { side: "left" | "right"; open: boolean; onClick: () => void }) {
+  const Icon = (side === "left") === open ? ChevronLeft : ChevronRight;
+  return (
+    <button type="button" onClick={onClick} aria-label={`${open ? "Hide" : "Show"} the ${side === "left" ? "asset list" : "side panel"}`}
+      className={cn("absolute top-[28vh] z-20 hidden h-12 w-4 place-items-center border border-line bg-raised text-dim hover:text-fg xl:grid",
+        side === "left" ? "-left-[17px] rounded-l-full border-r-0" : "-right-[17px] rounded-r-full border-l-0")}>
+      <Icon className="size-3.5" />
+    </button>
+  );
+}
 
 function technicalSection(body: string | null | undefined, asset: string) {
   if (!body) return null;
@@ -203,7 +215,9 @@ export default function Markets() {
           </div>
         </Box>}
 
-        <div className="min-w-0 space-y-4">
+        <div className="relative min-w-0 space-y-4">
+          <Edge side="left" open={prefs.left} onClick={() => setPrefs({ ...prefs, left: !prefs.left })} />
+          <Edge side="right" open={prefs.right} onClick={() => setPrefs({ ...prefs, right: !prefs.right })} />
           <section className="overflow-hidden rounded-xl border border-line bg-panel">
             <header className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-4 py-3">
               <div>
@@ -273,10 +287,6 @@ export default function Markets() {
               <Button size="sm" variant={drawing ? "default" : "outline"} className="h-7 gap-1.5 text-xs" onClick={() => { setDrawing(!drawing); setPending(null); }}>
                 <Crosshair className="size-3.5" />{drawing ? "Click the chart" : "Draw level"}
               </Button>
-              <div className="ml-auto hidden gap-1 xl:flex">
-                <Button size="icon" variant={prefs.left ? "ghost" : "outline"} className="size-7" aria-label={prefs.left ? "Hide the asset list" : "Show the asset list"} onClick={() => setPrefs({ ...prefs, left: !prefs.left })}><PanelLeft className="size-3.5" /></Button>
-                <Button size="icon" variant={prefs.right ? "ghost" : "outline"} className="size-7" aria-label={prefs.right ? "Hide the side panel" : "Show the side panel"} onClick={() => setPrefs({ ...prefs, right: !prefs.right })}><PanelRight className="size-3.5" /></Button>
-              </div>
             </div>
             {pending != null && (
               <form className="flex flex-wrap items-center gap-2 border-b border-line bg-brand-soft px-3 py-2" onSubmit={(e) => { e.preventDefault(); saveLevel(); }}>

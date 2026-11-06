@@ -74,7 +74,8 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
           <div className="rounded-md bg-sunk px-3 py-2">
             <p className="text-[11px] text-dim">Equity</p>
             <p className="font-mono text-lg leading-tight tabular-nums">{eq == null ? "–" : px(eq)} <span className="text-xs text-dim">{d.state?.quote}</span></p>
-            <p className={cn("font-mono text-[11px] tabular-nums", pnl >= 0 ? "text-up" : "text-down")}>{pnl >= 0 ? "+" : "−"}{Math.abs(pnl).toFixed(2)} profit{base != null && d.state?.invested != null ? `, ${px(base)} put in` : ""}</p>
+            <p className={cn("font-mono text-[11px] tabular-nums", pnl >= 0 ? "text-up" : "text-down")}>{pnl >= 0 ? "+" : "−"}{Math.abs(pnl).toFixed(2)} profit</p>
+            {base != null && d.state?.invested != null && <p className="font-mono text-[11px] text-dim tabular-nums">{px(base)} put in</p>}
           </div>
           <p className="px-1 text-[11px] text-dim">{d.state?.auto_execute ? "Auto-execute on" : "Manual approval"}</p>
         </div>
