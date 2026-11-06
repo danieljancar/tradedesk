@@ -119,7 +119,7 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
       for (const [p, color] of [[20, cssColor("--ema20")], [50, cssColor("--ema50")], [200, cssColor("--ema200")]] as const) {
         const e = ema(closes, p);
         if (e.every((x) => x == null)) continue;
-        chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+        chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: () => null })
           .setData(data.flatMap((c, i) => (e[i] == null ? [] : [{ time: t(c), value: e[i]! }])));
       }
     }
@@ -145,7 +145,8 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
       const a = barOf(from), b = barOf(to);
       if (a == null || b == null || a >= b || sg.t2 === sg.t1) continue;
       const at = (ts: number) => sg.p1 + ((sg.p2 - sg.p1) * (ts - sg.t1)) / (sg.t2 - sg.t1);
-      chart.addSeries(LineSeries, { color: sg.color, lineWidth: sg.width ?? 2, lineStyle: styles[sg.style ?? "dashed"], priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+      // pattern lines never stretch the price scale, the candles decide how tall the chart is
+      chart.addSeries(LineSeries, { color: sg.color, lineWidth: sg.width ?? 2, lineStyle: styles[sg.style ?? "dashed"], priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: () => null })
         .setData([{ time: a as UTCTimestamp, value: at(a) }, { time: b as UTCTimestamp, value: at(b) }]);
     }
     // plan and position zones, drawn on a canvas over the chart: green to the target, red to the stop
@@ -189,6 +190,8 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
     const v = view.current?.key === key ? view.current : null;
     const goal = want.current;
     if (goal) {
+      // a new window fits the candles again, even if the price scale was dragged by hand
+      chart.priceScale("right").applyOptions({ autoScale: true });
       const from = goal.from ?? 0;
       if (data[0].time > from && !done.current.has(key)) loadOlder.current();
       else want.current = null;

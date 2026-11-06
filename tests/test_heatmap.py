@@ -35,6 +35,7 @@ def test_gaps_and_missing_prices():
 
 def test_board_groups_and_fallback(monkeypatch):
     heatmap._cache = None
+    monkeypatch.setattr(heatmap, "caps", lambda symbols: {"^GSPC": 1.0})
     monkeypatch.setattr(
         heatmap,
         "_fetch",
@@ -44,3 +45,5 @@ def test_board_groups_and_fallback(monkeypatch):
     names = [g["name"] for g in out["groups"]]
     assert names[0] == "Indexes" and "Swiss stocks" in names
     assert out["groups"][0]["tiles"][0]["name"] == "S&P 500"
+    assert out["groups"][0]["tiles"][0]["cap"] == 1.0
+    assert out["groups"][0]["tiles"][1]["cap"] is None

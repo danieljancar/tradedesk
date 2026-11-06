@@ -109,7 +109,36 @@ GROUPS: dict[str, list[tuple[str, str, str]]] = {
     ],
 }
 
+QUOTE = "https://query1.finance.yahoo.com/v7/finance/quote"
+CAPS_TTL = 6 * 3600
+
 _cache: tuple[float, dict] | None = None
+_caps: tuple[float, dict[str, float]] | None = None
+
+
+def caps(symbols: list[str]) -> dict[str, float]:
+    """Market cap, or fund assets for ETFs, so the heatmap can size its tiles. Yahoo's quote
+    endpoint wants a session cookie and a crumb; empty if it refuses, and tiles size evenly."""
+    global _caps
+    if _caps and time.time() - _caps[0] < CAPS_TTL:
+        return _caps[1]
+    out: dict[str, float] = {}
+    try:
+        with httpx.Client(headers=UA, timeout=15, follow_redirects=True) as c:
+            c.get("https://fc.yahoo.com")
+            crumb = c.get("https://query1.finance.yahoo.com/v1/test/getcrumb").text.strip()
+            for i in range(0, len(symbols), 50):
+                r = c.get(QUOTE, params={"symbols": ",".join(symbols[i : i + 50]), "crumb": crumb})
+                r.raise_for_status()
+                for q in (r.json().get("quoteResponse") or {}).get("result") or []:
+                    size = q.get("marketCap") or q.get("netAssets") or q.get("totalAssets")
+                    if size:
+                        out[q["symbol"]] = float(size)
+    except (httpx.HTTPError, ValueError):
+        pass
+    if out:
+        _caps = (time.time(), out)
+    return out
 
 
 def changes(timestamps: list[int], closes: list, price: float) -> dict[str, float | None]:
@@ -167,12 +196,13 @@ def board() -> dict:
         if _cache:
             return _cache[1]
         raise RuntimeError("Yahoo Finance did not answer")
+    sizes = caps(symbols)
     out = {
         "groups": [
             {
                 "name": group,
                 "tiles": [
-                    {"symbol": s, "name": label, "sector": sector, **quotes[s]}
+                    {"symbol": s, "name": label, "sector": sector, "cap": sizes.get(s), **quotes[s]}
                     for s, label, sector in rows
                     if s in quotes
                 ],
