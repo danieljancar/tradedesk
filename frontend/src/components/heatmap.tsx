@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { squarify, type Rect } from "@/lib/treemap";
 
 type Period = "1d" | "1w" | "1m";
-type Tile = { symbol: string; name: string; sector: string; price: number; currency: string | null; cap: number | null } & Record<Period, number | null>;
+type Tile = { symbol: string; name: string; short?: string; sector: string; price: number; currency: string | null; cap: number | null } & Record<Period, number | null>;
 type Board = { groups: { name: string; tiles: Tile[] }[]; as_of: number };
 
 const PERIODS: { key: Period; label: string; full: number }[] = [
@@ -79,6 +79,12 @@ function TreeMap({ board, period, full, onGroup }: { board: Board; period: Perio
     ro.observe(el.current);
     return () => ro.disconnect();
   }, []);
+  const [tip, setTip] = useState<{ tile: Tile; x: number; y: number } | null>(null);
+  const hover = (tile: Tile | null, e?: React.MouseEvent) => {
+    if (!tile || !e || !el.current) return setTip(null);
+    const b = el.current.getBoundingClientRect();
+    setTip({ tile, x: e.clientX - b.left, y: e.clientY - b.top });
+  };
   const groups = board.groups.filter((g) => g.tiles.length);
   const h = w < 640 ? 1100 : Math.round(Math.min(Math.max(w * 0.62, 520), 760));
   const outer = w ? squarify(groups.map((g) => g.tiles.length), { x: 0, y: 0, w, h }) : [];
@@ -93,26 +99,53 @@ function TreeMap({ board, period, full, onGroup }: { board: Board; period: Perio
               <button type="button" onClick={() => onGroup(g.name)} className="absolute truncate px-1.5 text-left text-[10px] leading-[18px] font-semibold tracking-[0.08em] text-dim uppercase hover:text-fg" style={{ left: r.x, top: r.y, width: r.w }}>{g.name}</button>
               {inner.map((t, i) => {
                 const to = target(g.tiles[i].symbol);
-                return <Cell key={g.tiles[i].symbol} tile={g.tiles[i]} r={t} period={period} full={full} onOpen={to ? () => nav(`/markets/${to}`) : undefined} />;
+                return <Cell key={g.tiles[i].symbol} tile={g.tiles[i]} r={t} period={period} full={full} onOpen={to ? () => nav(`/markets/${to}`) : undefined} onHover={hover} />;
               })}
             </div>
           );
         })}
+        {tip && (
+          <div className="pointer-events-none absolute z-20 w-48 rounded-md border border-line bg-raised px-3 py-2 text-[12px] shadow-lg"
+            style={{ left: Math.min(tip.x + 14, w - 200), top: tip.y + 120 > h ? tip.y - 106 : tip.y + 14 }}>
+            <p className="font-semibold">{tip.tile.name}</p>
+            <p className="font-mono text-dim">{px(tip.tile.price)} {tip.tile.currency ?? ""}</p>
+            <div className="mt-1 grid grid-cols-3 gap-1 font-mono tabular-nums">
+              {(["1d", "1w", "1m"] as Period[]).map((k) => (
+                <span key={k} className={cn(tip.tile[k] == null ? "text-dim" : tip.tile[k]! >= 0 ? "text-up" : "text-down")}>
+                  <span className="block text-[10px] text-dim uppercase">{k}</span>{tip.tile[k] == null ? "–" : pc(tip.tile[k]!, 1)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function Cell({ tile, r, period, full, onOpen }: { tile: Tile; r: Rect; period: Period; full: number; onOpen?: () => void }) {
+// rough width of a line of text, Geist runs about 0.56em per character
+const fits = (text: string, size: number, w: number) => text.length * size * 0.56 + 8 <= w;
+
+/** The biggest label that fits: full name, then the short name, at 15 down to 9 px. */
+function label(tile: Tile, w: number, h: number) {
+  for (const size of [15, 13, 11, 10, 9]) {
+    if (h < size * 2.4) continue;
+    if (fits(tile.name, size, w)) return { text: tile.name, size };
+    const short = tile.short ?? tile.symbol;
+    if (fits(short, size, w)) return { text: short, size };
+  }
+  return null;
+}
+
+function Cell({ tile, r, period, full, onOpen, onHover }: { tile: Tile; r: Rect; period: Period; full: number; onOpen?: () => void; onHover: (t: Tile | null, e?: React.MouseEvent) => void }) {
   const v = tile[period];
-  const big = Math.min(r.w, r.h * 2.2);
-  const size = big > 160 ? 15 : big > 90 ? 13 : 11;
+  const l = label(tile, r.w, r.h);
   return (
-    <div title={`${tile.name}, ${px(tile.price)} ${tile.currency ?? ""}${v == null ? "" : `, ${pc(v, 2)}`}`} onClick={onOpen}
-      className={cn("absolute flex flex-col items-center justify-center overflow-hidden border border-[var(--t-line)] text-center text-fg", onOpen && "cursor-pointer hover:brightness-125")}
+    <div onClick={onOpen} onMouseMove={(e) => onHover(tile, e)} onMouseLeave={() => onHover(null)}
+      className={cn("absolute flex flex-col items-center justify-center overflow-hidden border border-[var(--t-line)] text-center leading-tight text-fg", onOpen && "cursor-pointer hover:brightness-125")}
       style={{ left: r.x, top: r.y, width: r.w, height: r.h, ...shade(v, full) }}>
-      {r.w > 44 && r.h > 26 && <span className="max-w-full truncate px-1 font-medium" style={{ fontSize: size }}>{tile.name}</span>}
-      {r.w > 34 && r.h > 16 && <span className="font-mono tabular-nums" style={{ fontSize: size - 1 }}>{v == null ? "–" : pc(v, 1)}</span>}
+      {l && <span className="max-w-full truncate px-1 font-medium" style={{ fontSize: l.size }}>{l.text}</span>}
+      {l && <span className="font-mono tabular-nums" style={{ fontSize: l.size - 1 }}>{v == null ? "–" : pc(v, 1)}</span>}
     </div>
   );
 }

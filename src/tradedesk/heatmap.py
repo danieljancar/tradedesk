@@ -112,6 +112,54 @@ GROUPS: dict[str, list[tuple[str, str, str]]] = {
 QUOTE = "https://query1.finance.yahoo.com/v7/finance/quote"
 CAPS_TTL = 6 * 3600
 
+# what a tile shows when the full name doesn't fit
+SHORT = {
+    "XLK": "Tech",
+    "XLC": "Comms",
+    "XLY": "Discret.",
+    "XLP": "Staples",
+    "XLV": "Health",
+    "XLF": "Finance",
+    "XLI": "Industry",
+    "XLE": "Energy",
+    "XLB": "Materials",
+    "XLU": "Utilities",
+    "XLRE": "Real est.",
+    "SMH": "Semis",
+    "IGV": "Software",
+    "XBI": "Biotech",
+    "ITA": "Defense",
+    "KRE": "Banks",
+    "XHB": "Homes",
+    "JETS": "Airlines",
+    "GDX": "Gold min.",
+    "URA": "Uranium",
+    "^GSPC": "S&P",
+    "^NDX": "NDX",
+    "^DJI": "Dow",
+    "^RUT": "R2000",
+    "^SSMI": "SMI",
+    "^STOXX50E": "SX5E",
+    "^GDAXI": "DAX",
+    "^FTSE": "FTSE",
+    "^N225": "Nikkei",
+    "^HSI": "HSI",
+    "GC=F": "Gold",
+    "SI=F": "Silver",
+    "HG=F": "Copper",
+    "CL=F": "Oil",
+    "NG=F": "Gas",
+    "DX-Y.NYB": "DXY",
+    "USDCHF=X": "USD/CHF",
+    "EURCHF=X": "EUR/CHF",
+    "^TNX": "10Y",
+}
+
+
+def short(symbol: str) -> str:
+    return SHORT.get(symbol) or symbol.removesuffix(".SW").removesuffix("-USD")
+
+
 _cache: tuple[float, dict] | None = None
 _caps: tuple[float, dict[str, float]] | None = None
 
@@ -160,6 +208,8 @@ def parse(payload: dict) -> dict[str, dict]:
         resp = (row.get("response") or [{}])[0]
         meta = resp.get("meta") or {}
         price = meta.get("regularMarketPrice")
+        # Yahoo's own day change, it knows about splits and holidays better than our closes
+        day = meta.get("regularMarketChangePercent")
         quote = ((resp.get("indicators") or {}).get("quote") or [{}])[0]
         if price is None:
             continue
@@ -168,6 +218,8 @@ def parse(payload: dict) -> dict[str, dict]:
             "currency": meta.get("currency"),
             **changes(resp.get("timestamp") or [], quote.get("close") or [], price),
         }
+        if day is not None:
+            out[row["symbol"]]["1d"] = day
     return out
 
 
@@ -202,7 +254,14 @@ def board() -> dict:
             {
                 "name": group,
                 "tiles": [
-                    {"symbol": s, "name": label, "sector": sector, "cap": sizes.get(s), **quotes[s]}
+                    {
+                        "symbol": s,
+                        "name": label,
+                        "short": short(s),
+                        "sector": sector,
+                        "cap": sizes.get(s),
+                        **quotes[s],
+                    }
                     for s, label, sector in rows
                     if s in quotes
                 ],

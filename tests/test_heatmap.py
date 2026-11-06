@@ -47,3 +47,10 @@ def test_board_groups_and_fallback(monkeypatch):
     assert out["groups"][0]["tiles"][0]["name"] == "S&P 500"
     assert out["groups"][0]["tiles"][0]["cap"] == 1.0
     assert out["groups"][0]["tiles"][1]["cap"] is None
+
+
+def test_day_change_from_yahoo_and_short_names():
+    row = spark("ITA", [100.0, 200.0], 210.0)
+    row["response"][0]["meta"]["regularMarketChangePercent"] = 1.2
+    assert heatmap.parse({"spark": {"result": [row]}})["ITA"]["1d"] == 1.2
+    assert heatmap.short("ITA") == "Defense" and heatmap.short("NESN.SW") == "NESN"
