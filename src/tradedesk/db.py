@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -152,6 +153,8 @@ class Database:
     def __init__(self, path: Path):
         self.path = path
         path.parent.mkdir(parents=True, exist_ok=True)
+        # the dashboard serves requests from a thread pool; one connection, one caller at a time
+        self.lock = threading.RLock()
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
@@ -167,14 +170,16 @@ class Database:
 
     @contextmanager
     def tx(self) -> Iterator[sqlite3.Connection]:
-        with self.conn:
+        with self.lock, self.conn:
             yield self.conn
 
     def all(self, sql: str, *args: Any) -> list[dict]:
-        return [dict(r) for r in self.conn.execute(sql, args).fetchall()]
+        with self.lock:
+            return [dict(r) for r in self.conn.execute(sql, args).fetchall()]
 
     def one(self, sql: str, *args: Any) -> dict | None:
-        row = self.conn.execute(sql, args).fetchone()
+        with self.lock:
+            row = self.conn.execute(sql, args).fetchone()
         return dict(row) if row else None
 
     def insert(self, table: str, **values: Any) -> int:

@@ -103,3 +103,15 @@ def test_index_pages_back_and_monthly(settings, db, market, monkeypatch):
     assert older[-1]["time"] < last[0]["time"] and len(older) == 50
     months = c.get("/api/candles/NDX?tf=1M&limit=1000").json()
     assert 100 < len(months) < 200
+
+
+def test_database_survives_parallel_requests(db):
+    from concurrent.futures import ThreadPoolExecutor
+
+    def work(i):
+        db.record_flow(1.0, "deposit")
+        return db.all("SELECT * FROM flows") and db.one("SELECT COUNT(*) AS n FROM flows")
+
+    with ThreadPoolExecutor(16) as pool:
+        assert all(pool.map(work, range(400)))
+    assert db.one("SELECT COUNT(*) AS n FROM flows")["n"] == 400
