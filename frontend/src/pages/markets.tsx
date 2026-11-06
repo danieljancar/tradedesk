@@ -47,13 +47,14 @@ type Patterns = Record<Scale, Shape | null> & { levels: { price: number; touches
 const SOURCE: Record<string, string> = { scan: "scan pick", gold: "gold", always: "always on", core: "core holding", watchlist: "watchlist" };
 const ts = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
-/** Half-round tab on the edge of the chart column that hides or shows the panel beside it. */
+/** Half-round handle on the panel it hides. With the panel gone it waits on the page edge. */
 function Edge({ side, open, onClick }: { side: "left" | "right"; open: boolean; onClick: () => void }) {
   const Icon = (side === "left") === open ? ChevronLeft : ChevronRight;
+  const at = side === "left" ? (open ? "left-[219px]" : "-left-[19px]") : (open ? "right-[339px]" : "-right-[19px]");
   return (
     <button type="button" onClick={onClick} aria-label={`${open ? "Hide" : "Show"} the ${side === "left" ? "asset list" : "side panel"}`}
-      className={cn("absolute top-[28vh] z-20 hidden h-12 w-4 place-items-center border border-line bg-raised text-dim hover:text-fg xl:grid",
-        side === "left" ? "-left-[17px] rounded-l-full border-r-0" : "-right-[17px] rounded-r-full border-l-0")}>
+      className={cn("absolute top-40 z-20 hidden h-12 w-4 place-items-center border border-line bg-raised text-dim hover:text-fg xl:grid", at,
+        side === "left" ? "rounded-r-full border-l-0" : "rounded-l-full border-r-0")}>
       <Icon className="size-3.5" />
     </button>
   );
@@ -189,10 +190,12 @@ export default function Markets() {
 
   return (
     <Page className="max-w-none">
-      <div className={cn("grid gap-4",
+      <div className={cn("relative grid gap-4",
         prefs.left && prefs.right && "xl:grid-cols-[220px_minmax(0,1fr)_340px]",
         prefs.left && !prefs.right && "xl:grid-cols-[220px_minmax(0,1fr)]",
         !prefs.left && prefs.right && "xl:grid-cols-[minmax(0,1fr)_340px]")}>
+        <Edge side="left" open={prefs.left} onClick={() => setPrefs({ ...prefs, left: !prefs.left })} />
+        <Edge side="right" open={prefs.right} onClick={() => setPrefs({ ...prefs, right: !prefs.right })} />
         {prefs.left && <Box pad={false} className="xl:self-start">
           <div className="flex gap-2 overflow-x-auto p-1.5 xl:block xl:space-y-2">
             <AssetGroup id="coins" title="Coins" active={asset} rows={d.watch.map((a) => {
@@ -215,9 +218,7 @@ export default function Markets() {
           </div>
         </Box>}
 
-        <div className="relative min-w-0 space-y-4">
-          <Edge side="left" open={prefs.left} onClick={() => setPrefs({ ...prefs, left: !prefs.left })} />
-          <Edge side="right" open={prefs.right} onClick={() => setPrefs({ ...prefs, right: !prefs.right })} />
+        <div className="min-w-0 space-y-4">
           <section className="overflow-hidden rounded-xl border border-line bg-panel">
             <header className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-4 py-3">
               <div>
