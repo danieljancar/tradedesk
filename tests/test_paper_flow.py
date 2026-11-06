@@ -94,3 +94,15 @@ def test_kill_cancels_and_flattens(settings, db, market, tmp_path):
     desk.execute()
     desk.kill(flatten=True)
     assert db.open_positions() == []
+
+
+def test_entry_cancelled_when_target_comes_first(settings, db, market, tmp_path):
+    desk = make_desk(settings, db, market)
+    [result] = desk.check_plans(plans_file(tmp_path))
+    desk.approve(result["id"])
+    desk.execute()
+    market.add(low=101, high=112)
+    market.prices["BTCUSDT"] = 112
+    assert "target before the entry" in desk.sync()[0]
+    assert db.all("SELECT status FROM plans")[0]["status"] == "expired"
+    assert db.all("SELECT * FROM positions") == []

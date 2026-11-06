@@ -702,16 +702,21 @@ class Desk:
         if status == "cancelled":
             self.db.update("plans", plan["id"], status="cancelled", updated_at=now())
             return [f"plan {plan['id']} cancelled by the exchange"]
+        # the move happened without us: entering now would chase a trade that already paid out
+        sign = 1 if plan["side"] == "long" else -1
+        missed = (self.broker.price(plan["symbol"]) - plan["take_profit"]) * sign >= 0
         ttl = timedelta(hours=self.settings.execution.entry_ttl_hours)
-        if datetime.now(UTC) - datetime.fromisoformat(plan["updated_at"]) <= ttl:
+        old = datetime.now(UTC) - datetime.fromisoformat(plan["updated_at"]) > ttl
+        if not (missed or old):
             return []
         partial = self.broker.cancel(plan)
         if partial:
             self._open_position(plan, partial)
-            return [f"plan {plan['id']} expired part filled, {partial.qty:g} kept with its stop"]
+            return [f"plan {plan['id']} ended part filled, {partial.qty:g} kept with its stop"]
+        why = "reached its target before the entry" if missed else "expired unfilled"
         self.db.update("plans", plan["id"], status="expired", updated_at=now())
-        self.log("exchange", "cancel", f"Entry for {plan['asset']} expired unfilled")
-        return [f"plan {plan['id']} expired"]
+        self.log("exchange", "cancel", f"Entry for {plan['asset']} {why}")
+        return [f"plan {plan['id']} {why}"]
 
     def _sync_position(self, pos: dict) -> list[str]:
         exit_ = self.broker.exit_status(pos)
