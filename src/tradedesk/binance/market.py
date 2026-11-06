@@ -2,9 +2,13 @@ from dataclasses import dataclass
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from functools import cached_property
 
+import httpx
+
 from tradedesk.binance.client import Client
 from tradedesk.config import Market
 from tradedesk.indicators import Candle
+
+PRODUCTS = "https://www.binance.com/bapi/asset/v2/public/asset-service/product/get-products"
 
 
 @dataclass(frozen=True)
@@ -73,6 +77,19 @@ class MarketData:
 
     def spot_symbols(self) -> list[dict]:
         return self.spot.public("/api/v3/exchangeInfo")["symbols"]
+
+    def tagged(self, tags: list[str]) -> set[str]:
+        """Base assets with any of these tags on binance.com, empty if the site doesn't answer."""
+        if not tags:
+            return set()
+        try:
+            r = httpx.get(PRODUCTS, timeout=10)
+            r.raise_for_status()
+            rows = r.json()["data"]
+        except (httpx.HTTPError, ValueError, KeyError):
+            return set()
+        wanted = set(tags)
+        return {p["b"] for p in rows if wanted & set(p.get("tags") or [])}
 
     def derivatives(self, symbol: str) -> dict | None:
         try:

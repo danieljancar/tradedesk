@@ -54,6 +54,11 @@ class ScanMarket(FakeMarket):
     def spot_symbols(self):
         return self.symbols
 
+    stocks: frozenset[str] = frozenset()
+
+    def tagged(self, tags):
+        return self.stocks if "bStocks" in tags else set()
+
     def klines(self, symbol, interval, limit=200, start_ms=None):
         base = symbol.removesuffix("USDT")
         step, wide = MOVES.get(base, 0.0), SWING.get(base, 0.01)
@@ -223,3 +228,10 @@ def test_snapshot_runs_the_scan_first(monkeypatch, tmp_path):
     d.start_run()
     d.write_snapshot()
     assert calls == [1]
+
+
+def test_scan_leaves_out_tagged_assets(settings):
+    settings.universe = Universe(top=3)
+    m = ScanMarket()
+    m.stocks = {"MOON"}
+    assert "MOON" not in {r["asset"] for r in universe.scan(settings, m)}

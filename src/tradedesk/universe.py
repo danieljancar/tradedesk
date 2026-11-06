@@ -59,11 +59,13 @@ def leveraged(base: str, bases: set[str]) -> bool:
     )
 
 
-def candidates(settings: Settings, tickers: list[dict], symbols: list[dict]) -> list[dict]:
-    """Liquid, trading pairs in the quote currency, without stablecoins, fiat or leveraged
-    tokens, sorted by 24h quote volume."""
+def candidates(
+    settings: Settings, tickers: list[dict], symbols: list[dict], skip: set[str] = frozenset()
+) -> list[dict]:
+    """Liquid, trading pairs in the quote currency, without stablecoins, fiat, leveraged
+    tokens or tagged assets, sorted by 24h quote volume."""
     quote = settings.quote.upper()
-    excluded = STABLES | {a.upper() for a in settings.universe.exclude} | {quote}
+    excluded = STABLES | {a.upper() for a in settings.universe.exclude} | {quote} | skip
     pairs = {
         s["symbol"]: s["baseAsset"]
         for s in symbols
@@ -146,7 +148,8 @@ def score(rows: list[dict], btc_7d: float) -> list[dict]:
 
 
 def scan(settings: Settings, md: MarketData) -> list[dict]:
-    pool = candidates(settings, md.tickers(), md.spot_symbols())[:CANDIDATES]
+    skip = md.tagged(settings.universe.exclude_tags)
+    pool = candidates(settings, md.tickers(), md.spot_symbols(), skip)[:CANDIDATES]
     btc = change_7d([k.close for k in md.klines(settings.symbol("BTC"), "1d", 30)]) or 0.0
     rows = []
     for c in pool:

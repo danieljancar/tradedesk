@@ -112,6 +112,8 @@ class Universe(BaseModel):
     max_assets: int = Field(12, ge=1)
     always: list[str] = []
     exclude: list[str] = []
+    # Binance product tags to leave out of the scan, bStocks are tokenized US stocks
+    exclude_tags: list[str] = ["bStocks"]
     include_gold: bool = True
 
 
