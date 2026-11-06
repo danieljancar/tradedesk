@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Box, Page } from "@/components/shell";
+import { Box, Page, PageSkeleton } from "@/components/shell";
 import { Term } from "@/components/term";
-import { api, useInterval } from "@/lib/api";
+import { refetch, useApi } from "@/lib/query";
 import { useDeskCtx } from "@/lib/desk-context";
 import { pc, px } from "@/lib/learn";
 import { cn } from "@/lib/utils";
@@ -56,19 +55,13 @@ function Drift({ pct, band }: { pct: number; band: number }) {
 
 export default function Portfolio() {
   const d = useDeskCtx();
-  const [p, setP] = useState<PortfolioState | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [band, setBand] = useState(5);
-  const load = useCallback(() => {
-    api<PortfolioState>("/api/portfolio").then((x) => { setP(x); setError(null); }).catch((e) => setError(e.message));
-  }, []);
-  useEffect(() => { load(); api<any>("/api/settings").then((c) => setBand(c.settings.portfolio.rebalance_band_pct)).catch(() => {}); }, [load]);
-  useInterval(load, 30000);
+  const { data: p, error } = useApi<PortfolioState>("/api/portfolio", { every: 30_000 });
+  const band = useApi<any>("/api/settings", { stale: 300_000 }).data?.settings.portfolio.rebalance_band_pct ?? 5;
 
-  const act = async (path: string, ok: string) => { if (await d.act(path, "POST", ok)) load(); };
+  const act = async (path: string, ok: string) => { if (await d.act(path, "POST", ok)) refetch("/api/portfolio"); };
 
-  if (error) return <Page><Box title="Portfolio"><p className="text-sm text-down">Couldn't load the portfolio: {error}</p></Box></Page>;
-  if (!p) return <Page><div className="h-40 animate-pulse rounded-xl bg-panel" /></Page>;
+  if (error && !p) return <Page><Box title="Portfolio"><p className="text-sm text-down">Couldn't load the portfolio: {error.message}</p></Box></Page>;
+  if (!p) return <PageSkeleton />;
 
   const q = p.quote;
   const coreOn = p.sleeves.core.target_pct > 0;

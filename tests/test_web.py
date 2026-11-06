@@ -72,3 +72,17 @@ def test_settings_edit_validates_and_protects_mode(settings, db, market, tmp_pat
     assert r.status_code == 200
     assert r.json()["settings"]["risk"]["risk_per_trade_pct"] == 2.5
     assert 'mode = "paper"' in cfg.read_text() and settings.watchlist == ["ETH", "SOL"]
+
+
+def test_index_candles_and_patterns(settings, db, market, monkeypatch):
+    days = [(f"2024-{1 + i // 28:02d}-{1 + i % 28:02d}", 5000 + (i % 20) * 10) for i in range(300)]
+    monkeypatch.setattr("tradedesk.macro.fred", lambda sid, days_back: days)
+    c, _ = client(settings, db, market)
+    daily = c.get("/api/candles/SPX?tf=1d&limit=100").json()
+    assert len(daily) == 100 and daily[-1]["close"] == days[-1][1]
+    weekly = c.get("/api/candles/SPX?tf=1w&limit=500").json()
+    assert len(weekly) < len(days)
+    assert c.get("/api/candles/SPX?tf=4h").status_code == 404
+    shape = c.get("/api/patterns/SPX").json()
+    assert shape["short"] is None
+    assert set(shape) == {"short", "mid", "long", "levels"}

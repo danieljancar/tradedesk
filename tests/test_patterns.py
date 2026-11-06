@@ -1,5 +1,5 @@
 from tradedesk.indicators import Candle
-from tradedesk.patterns import find, name
+from tradedesk.patterns import find, levels, name
 
 
 def candles(highs, lows):
@@ -56,3 +56,13 @@ def test_index_closes_get_a_pattern():
     assert d["pattern"] and d["pattern"]["pattern"]
     assert len(d["series"]) == 120
     assert _pack("VIXCLS", "VIX", "Risk", "", "", pts)["pattern"] is None
+
+
+def test_levels_group_repeated_turns():
+    # price turns at 100 and 120 again and again
+    cs = wave(120, top=lambda i: 120, bottom=lambda i: 100, period=12)
+    found = levels(cs, width=3)
+    prices = sorted(round(x["price"]) for x in found[:2])
+    assert prices == [100, 120]
+    assert all(x["touches"] >= 2 for x in found)
+    assert {x["kind"] for x in found[:2]} == {"support", "resistance"}

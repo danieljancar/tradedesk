@@ -180,6 +180,30 @@ def _verdict(sid: str, points: list[tuple[str, float]]) -> tuple[int, str]:
 
 
 PATTERNED = {"SP500", "NASDAQCOM"}
+# indexes the markets page can chart, by the name the dashboard uses
+INDEXES = {"SPX": "SP500", "NDX": "NASDAQCOM"}
+
+
+def index_candles(name: str, tf: str, limit: int) -> list[Candle]:
+    """FRED only has closes, so each bar opens at the previous close."""
+    days = limit * (7 if tf == "1w" else 1.5) + 14
+    points = _cached(f"fred:{name}:{int(days)}", 3600, lambda: fred(INDEXES[name], int(days)))
+    if not points:
+        raise RuntimeError("FRED did not answer")
+    bars: list[Candle] = []
+    prev = points[0][1]
+    for d, v in points:
+        day = datetime.fromisoformat(d).replace(tzinfo=UTC)
+        if tf == "1w":
+            day -= timedelta(days=day.weekday())
+        t = int(day.timestamp() * 1000)
+        if bars and bars[-1].open_time == t:
+            b = bars[-1]
+            bars[-1] = Candle(t, b.open, max(b.high, v), min(b.low, v), v, 0)
+        else:
+            bars.append(Candle(t, prev, max(prev, v), min(prev, v), v, 0))
+        prev = v
+    return bars[-limit:]
 
 
 def _pattern(tail: list) -> dict | None:

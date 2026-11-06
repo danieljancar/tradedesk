@@ -12,6 +12,8 @@ import { CAST } from "@/lib/cast";
 import { GLOSSARY, pc, planStory, px, readAsset, readMood } from "@/lib/learn";
 import { api, useInterval, type Candle, type DeskEvent, type DeskState, type Plan, type Run } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const money = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(2)}`;
@@ -506,13 +508,9 @@ type Report = {
 const OUTCOME: Record<string, string> = { target: "text-up", stop: "text-down", open: "text-fg", waiting: "text-dim", expired: "text-dim" };
 
 export function ReportView() {
-  const [rep, setRep] = useState<Report | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const load = () => api<Report>("/api/report").then((r) => { setRep(r); setErr(null); }).catch((e) => setErr(e.message));
-  useEffect(() => { load(); }, []);
-  useInterval(load, 60000);
-  if (err) return <Empty>Report failed: {err}</Empty>;
-  if (!rep) return <Empty>Loading…</Empty>;
+  const { data: rep, error } = useApi<Report>("/api/report", { every: 60_000 });
+  if (error && !rep) return <Empty>Report failed: {error.message}</Empty>;
+  if (!rep) return <div className="space-y-2 p-4">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-8 bg-sunk" />)}</div>;
   const eq = rep.equity.at(-1)?.value ?? rep.start_equity;
   const taken = rep.plans.filter((p) => ["placed", "approved", "filled", "closed"].includes(p.status) || p.exchange);
   const resolved = rep.plans.filter((p) => p.replay.outcome === "target" || p.replay.outcome === "stop");
@@ -612,14 +610,14 @@ const SOURCES = (asset: string) => [
   ]],
 ] as const;
 
+const NO_NEWS: Headline[] = [];
+
 export function NewsPanel({ asset }: { asset: string }) {
-  const [items, setItems] = useState<Headline[]>([]);
+  const items = useApi<Headline[]>("/api/news", { every: 120_000 }).data ?? NO_NEWS;
   const [cat, setCat] = useState<string>("all");
   const [topic, setTopic] = useState<string | null>(null);
   const [, tick] = useState(0);
-  const load = () => api<Headline[]>("/api/news").then(setItems).catch(() => {});
-  useEffect(() => { load(); }, []);
-  useInterval(() => { load(); tick((x) => x + 1); }, 120000);
+  useInterval(() => tick((x) => x + 1), 120000);
   const top = useMemo(() => trending(items), [items]);
   const shown = items.filter((h) => (cat === "all" || h.category === cat) && (!topic || h.title.includes(topic))).slice(0, 80);
   return (

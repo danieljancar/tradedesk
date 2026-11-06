@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bar, BarChart, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Box } from "@/components/shell";
 import { Term } from "@/components/term";
-import { api } from "@/lib/api";
+
 import { pc } from "@/lib/learn";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query";
 
 type Point = { t: number } & Record<string, number>;
 type Data = { open_interest: Point[]; long_short: Point[]; top_traders: Point[]; taker: Point[]; funding: Point[] };
@@ -33,15 +34,9 @@ function Panel({ title, term, value, tone, note, children }: { title: string; te
 
 export function Positioning({ asset }: { asset: string }) {
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>("4h");
-  const [data, setData] = useState<Data | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    setData(null); setError(null);
-    api<Data>(`/api/positioning/${asset}?period=${period}`).then((d) => live && setData(d)).catch((e) => live && setError(e.message));
-    return () => { live = false; };
-  }, [asset, period]);
+  const q = useApi<Data>(`/api/positioning/${asset}?period=${period}`, { stale: 120_000 });
+  const data = q.data ?? null;
+  const error = q.data ? null : (q.error?.message ?? null);
 
   const empty = data && Object.values(data).every((s) => !s.length);
   const ls = (data?.long_short ?? []).map((p) => ({ t: p.t, accounts: p.accounts, positions: data?.top_traders.find((x) => x.t === p.t)?.positions }));

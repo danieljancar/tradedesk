@@ -17,13 +17,17 @@ export function Ask() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [q, setQ] = useState("");
-  const end = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const thinking = items.some((i) => i.status === "thinking");
   const load = () => api<Item[]>("/api/ask").then(setItems).catch(() => {});
 
   useEffect(() => { if (open) load(); }, [open]);
   useInterval(() => { if (open && thinking) load(); }, 2000);
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [items.length, thinking, open]);
+  // scroll only the chat, scrollIntoView would also move the page behind the sheet
+  useEffect(() => {
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [items.length, thinking, open]);
 
   const send = async () => {
     const question = q.trim();
@@ -44,7 +48,7 @@ export function Ask() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
           <SheetHeader className="border-b border-line px-4 py-3"><SheetTitle>Ask the desk</SheetTitle></SheetHeader>
-          <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          <div ref={list} className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
             {!items.length && <p className="text-sm text-dim">Questions about the market, the news or the desk's trades. Answers can take up to a minute.</p>}
             {items.map((i) => (
               <div key={i.id} className="space-y-2">
@@ -54,7 +58,6 @@ export function Ask() {
                   : <div className={cn("max-w-[95%] rounded-lg bg-sunk px-3 py-2", i.status === "error" && "text-down")}><Prose html={html(i.answer)} className="text-[14px]" /></div>}
               </div>
             ))}
-            <div ref={end} />
           </div>
           <form className="flex items-end gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); send(); }}>
             <Textarea value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}

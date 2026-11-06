@@ -6,6 +6,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Ask } from "@/components/ask";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Crash } from "@/components/crash";
 import { Avatar } from "@/components/panels";
 import { useDeskCtx } from "@/lib/desk-context";
 import { px } from "@/lib/learn";
@@ -103,7 +105,7 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
               <span className={cn("size-1.5 rounded-full", live ? "animate-pulse bg-up" : "bg-dim/60")} />
               {live ? "Desk working" : latest ? `Idle, last run ${lastAt}` : "No runs yet"}
             </NavLink>
-            <Ask />
+            <Crash><Ask /></Crash>
             <Button size="sm" onClick={d.runNow} disabled={live} className="h-8 gap-1.5">
               <Play className="size-3.5" /> <span className="hidden sm:inline">Run desk</span>
             </Button>
@@ -143,6 +145,16 @@ export function Shell({ children, dark, toggle }: { children: ReactNode; dark: b
         </Sheet>
       </nav>
     </div>
+  );
+}
+
+export function PageSkeleton() {
+  return (
+    <Page>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-20 bg-panel" />)}</div>
+      <Skeleton className="h-64 bg-panel" />
+      <Skeleton className="h-40 bg-panel" />
+    </Page>
   );
 }
 

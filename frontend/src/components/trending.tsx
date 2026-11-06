@@ -1,18 +1,15 @@
-import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Box } from "@/components/shell";
-import { api, useInterval } from "@/lib/api";
+import { useApi } from "@/lib/query";
 import { pc, px } from "@/lib/learn";
 import { cn } from "@/lib/utils";
 
 type Coin = { symbol: string; name: string; rank: number | null; price: number | null; change_24h: number | null; volume: number | null; on_binance: boolean; url: string };
 
 export function Trending() {
-  const [rows, setRows] = useState<Coin[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const load = () => api<Coin[]>("/api/trending").then((r) => { setRows(r); setError(null); }).catch((e) => setError(e.message));
-  useEffect(() => { load(); }, []);
-  useInterval(load, 600_000);
+  const q = useApi<Coin[]>("/api/trending", { every: 600_000, stale: 300_000 });
+  const rows = q.data ?? null;
+  const error = q.error?.message ?? null;
 
   return (
     <Box title="Trending on CoinGecko" pad={false} right={<span className="text-xs text-dim">watch only</span>}>

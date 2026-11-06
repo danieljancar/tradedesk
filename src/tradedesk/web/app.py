@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Body, FastAPI, Header, HTTPException
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from markdown_it import MarkdownIt
@@ -18,6 +19,7 @@ from tradedesk import (
     macro,
     notes,
     notify,
+    patterns,
     portfolio,
     settings_io,
     trending,
@@ -42,10 +44,20 @@ def guard(x_desk: str | None) -> None:
         raise HTTPException(403, "missing X-Desk header")
 
 
+class Assets(StaticFiles):
+    """Built files carry a content hash in their name, so the browser can keep them for good."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 def create_app(desk: Desk) -> FastAPI:
     app = FastAPI(title="tradedesk", docs_url=None, redoc_url=None)
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     if (DIST / "assets").is_dir():
-        app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
+        app.mount("/assets", Assets(directory=DIST / "assets"), name="assets")
     db = desk.db
     cache: dict[tuple, tuple[float, Any]] = {}
 
@@ -54,23 +66,35 @@ def create_app(desk: Desk) -> FastAPI:
         page = DIST / "index.html"
         return page.read_text() if page.exists() else NOT_BUILT
 
-    @app.get("/api/candles/{asset}")
-    def candles(asset: str, tf: str = "1d", limit: int = 200) -> list[dict]:
+    def bars(asset: str, tf: str, limit: int) -> list:
         asset = asset.upper()
+        index = asset in macro.INDEXES
         known = {*desk.settings.watchlist, "BTC", "ETH", *(a["asset"] for a in desk.run_assets())}
-        if asset not in known or tf not in TIMEFRAMES:
+        if (
+            tf not in TIMEFRAMES
+            or not (index or asset in known)
+            or (index and tf not in ("1d", "1w"))
+        ):
             raise HTTPException(404, "unknown asset or timeframe")
+        limit = max(10, min(limit, 500))
         key = (asset, tf, limit)
         hit = cache.get(key)
         if hit and time.monotonic() - hit[0] < 60:
             return hit[1]
         try:
-            rows = market_data(desk.settings).klines(
-                desk.settings.symbol(asset), tf, max(10, min(limit, 500))
-            )
+            if index:
+                rows = macro.index_candles(asset, tf, limit)
+            else:
+                rows = market_data(desk.settings).klines(desk.settings.symbol(asset), tf, limit)
         except Exception as e:
-            raise HTTPException(502, f"Binance did not answer: {e}") from e
-        out = [
+            source = "FRED" if index else "Binance"
+            raise HTTPException(502, f"{source} did not answer: {e}") from e
+        cache[key] = (time.monotonic(), rows)
+        return rows
+
+    @app.get("/api/candles/{asset}")
+    def candles(asset: str, tf: str = "1d", limit: int = 200) -> list[dict]:
+        return [
             {
                 "time": c.open_time // 1000,
                 "open": c.open,
@@ -79,9 +103,29 @@ def create_app(desk: Desk) -> FastAPI:
                 "close": c.close,
                 "volume": c.volume,
             }
-            for c in rows
+            for c in bars(asset, tf, limit)
         ]
-        cache[key] = (time.monotonic(), out)
+
+    @app.get("/api/patterns/{asset}")
+    def chart_patterns(asset: str) -> dict:
+        """Trendline patterns at three scales and the long-term levels, for the chart."""
+        index = asset.upper() in macro.INDEXES
+        out: dict[str, Any] = {}
+        for scale, (tf, lookback, width) in patterns.SCALES.items():
+            if index and tf == "4h":
+                out[scale] = None
+                continue
+            try:
+                rows = bars(asset, tf, lookback)
+            except HTTPException:
+                out[scale] = None
+                continue
+            found = patterns.find(rows, lookback=lookback, width=width)
+            out[scale] = found and {**found, "tf": tf}
+        try:
+            out["levels"] = patterns.levels(bars(asset, "1w", 500))
+        except HTTPException:
+            out["levels"] = []
         return out
 
     @app.get("/api/runs")

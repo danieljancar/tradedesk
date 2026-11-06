@@ -3,8 +3,9 @@ import {
   CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineStyle, createChart,
   type IChartApi, type UTCTimestamp,
 } from "lightweight-charts";
-import { api, type Candle } from "@/lib/api";
+import { type Candle } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useApi } from "@/lib/query";
 
 function ema(values: number[], period: number) {
   const k = 2 / (period + 1);
@@ -36,8 +37,9 @@ export type Levels = { support: number[]; resistance: number[] };
 
 export function PriceChart({ asset, tf, levels, height = 300, emas = true }: { asset: string; tf: string; levels?: Levels; height?: number | string; emas?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
-  const [data, setData] = useState<Candle[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const q = useApi<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=${tf === "1w" ? 160 : 220}`, { stale: 60_000 });
+  const data = q.data ?? null;
+  const err = q.data ? null : (q.error?.message ?? null);
   const [scheme, setScheme] = useState(() => document.documentElement.classList.contains("dark"));
 
   useEffect(() => {
@@ -46,15 +48,6 @@ export function PriceChart({ asset, tf, levels, height = 300, emas = true }: { a
     return () => mo.disconnect();
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    setData(null);
-    setErr(null);
-    api<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=${tf === "1w" ? 160 : 220}`)
-      .then((d) => alive && setData(d))
-      .catch((e) => alive && setErr(e.message));
-    return () => { alive = false; };
-  }, [asset, tf]);
 
   useEffect(() => {
     if (!data || !box.current) return;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 import { Crosshair, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,22 @@ import { useDeskCtx } from "@/lib/desk-context";
 import { pc, px, readAsset } from "@/lib/learn";
 import type { Candle } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useApi } from "@/lib/query";
 
 const TFS = ["1h", "4h", "1d", "1w"] as const;
+// charted from FRED daily closes, so only daily and weekly bars
+const INDEXES: Record<string, { name: string; driver: string }> = {
+  SPX: { name: "S&P 500", driver: "SP500" },
+  NDX: { name: "Nasdaq Composite", driver: "NASDAQCOM" },
+};
+type Scale = "short" | "mid" | "long";
+const SCALES: { key: Scale; label: string; tf: string; width: 1 | 2 | 3; style: "solid" | "dashed" | "dotted" }[] = [
+  { key: "long", label: "Long term", tf: "1w", width: 3, style: "solid" },
+  { key: "mid", label: "Mid term", tf: "1d", width: 2, style: "dashed" },
+  { key: "short", label: "Short term", tf: "4h", width: 1, style: "dotted" },
+];
+type Shape = { pattern: string; position: string; tf: string; upper: { t1: number; p1: number; t_end: number; p_end: number }; lower: { t1: number; p1: number; t_end: number; p_end: number } };
+type Patterns = Record<Scale, Shape | null> & { levels: { price: number; touches: number; since: number; kind: "support" | "resistance" }[] };
 const SOURCE: Record<string, string> = { scan: "found by the scan", gold: "gold", always: "always watched", core: "core holding", watchlist: "watchlist" };
 const ts = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
@@ -43,7 +57,12 @@ export default function Markets() {
   const asset = (param ?? d.watch[0] ?? "BTC").toUpperCase();
   const ticks = useTickers(d.watch);
   const [tf, setTf] = useState<(typeof TFS)[number]>("4h");
-  const [ov, setOv] = useState<Overlay>({ ema: true, volume: true, levels: true, plans: true, mine: true, patterns: true });
+  const [ov, setOv] = useState<Overlay>({ ema: true, volume: true, levels: true, plans: true, mine: true });
+  const [scales, setScales] = useState<Record<Scale, boolean>>({ long: true, mid: true, short: true });
+  const index = INDEXES[asset];
+  useEffect(() => { if (index && (tf === "1h" || tf === "4h")) setTf("1d"); }, [index, tf]);
+  const pat = useApi<Patterns>(`/api/patterns/${asset}`, { stale: 900_000, every: 900_000 }).data;
+  const driver = index ? d.macro?.drivers?.find((x: any) => x.id === index.driver) : null;
   const [drawing, setDrawing] = useState(false);
   const [pending, setPending] = useState<number | null>(null);
   const [label, setLabel] = useState("");
@@ -85,18 +104,27 @@ export default function Markets() {
       }
     }
     if (ov.mine) for (const n of mine.filter((n) => n.price != null)) out.push({ price: n.price!, title: n.text.slice(0, 18), color: mineC, style: "dotted", width: 2 });
+    if (scales.long) {
+      for (const l of pat?.levels ?? []) {
+        out.push({ price: l.price, title: `${l.touches}× weekly ${l.kind}`, color: cssColor(l.kind === "support" ? "--up" : "--down", 0.55), style: "solid", width: 1 });
+      }
+    }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ov, f, tf, JSON.stringify(plans), JSON.stringify(open), JSON.stringify(mine), Math.round((t?.price ?? 0) / 100)]);
+  }, [ov, f, tf, scales.long, JSON.stringify(pat?.levels), JSON.stringify(plans), JSON.stringify(open), JSON.stringify(mine), Math.round((t?.price ?? 0) / 100)]);
 
-  const frame = tf === "1h" || tf === "4h" ? "4h" : "1d";
-  const shape = f?.patterns?.[frame];
+  const shapes = SCALES.map((s) => ({ ...s, shape: pat?.[s.key] ?? null })).filter((s) => s.shape);
   const segments = useMemo<SegmentSpec[]>(() => {
-    if (!ov.patterns || !shape) return [];
     const c = cssColor("--ema200");
-    return (["upper", "lower"] as const).map((k) => ({ t1: shape[k].t1, p1: shape[k].p1, t2: shape[k].t_end, p2: shape[k].p_end, color: c }));
+    // short-term lines only make sense on the short charts
+    return shapes
+      .filter((s) => scales[s.key] && !(s.key === "short" && (tf === "1d" || tf === "1w")))
+      .flatMap((s) => (["upper", "lower"] as const).map((k) => ({
+        t1: s.shape![k].t1, p1: s.shape![k].p1, t2: s.shape![k].t_end, p2: s.shape![k].p_end,
+        color: c, width: s.width, style: s.style, extend: true,
+      })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ov.patterns, JSON.stringify(shape)]);
+  }, [tf, JSON.stringify(scales), JSON.stringify(shapes)]);
 
   const boxes = useMemo<BoxSpec[]>(() => {
     if (!ov.plans) return [];
@@ -149,6 +177,21 @@ export default function Markets() {
                 </li>
               );
             })}
+            <li className="hidden px-2.5 pt-3 pb-1 text-[11px] font-semibold tracking-[0.08em] text-dim uppercase xl:block">Indexes</li>
+            {Object.entries(INDEXES).map(([k, ix]) => {
+              const dr = d.macro?.drivers?.find((x: any) => x.id === ix.driver);
+              return (
+                <li key={k} className="shrink-0">
+                  <NavLink to={`/markets/${k}`} className={({ isActive }) => cn("flex items-center justify-between gap-3 rounded-md px-2.5 py-2 hover:bg-raised", isActive && "bg-raised")}>
+                    <span className="block font-semibold">{ix.name}</span>
+                    <span className="text-right">
+                      <span className="block font-mono text-[13px] tabular-nums">{dr?.value != null ? px(dr.value) : "–"}</span>
+                      <span className={cn("block font-mono text-[11px] tabular-nums", dr?.change_1w != null && (dr.change_1w >= 0 ? "text-up" : "text-down"))}>{dr?.change_1w != null ? `${pc(dr.change_1w, 2)} 1w` : ""}</span>
+                    </span>
+                  </NavLink>
+                </li>
+              );
+            })}
           </ul>
         </Box>
 
@@ -156,9 +199,19 @@ export default function Markets() {
           <section className="overflow-hidden rounded-xl border border-line bg-panel">
             <header className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-4 py-3">
               <div>
-                <p className="text-xs text-dim">{asset}/USDT{pick?.asset_class === "gold" ? ", one token is one troy ounce of gold" : ""}</p>
-                <p className="font-mono text-2xl font-medium tabular-nums">{px(t?.price ?? f?.price)}
-                  <span className={cn("ml-2 text-sm", t && (t.ch >= 0 ? "text-up" : "text-down"))}>{t ? pc(t.ch, 2) : ""}</span></p>
+                {index ? (
+                  <>
+                    <p className="text-xs text-dim">{index.name}, daily closes from FRED{driver?.as_of ? `, last ${driver.as_of}` : ""}</p>
+                    <p className="font-mono text-2xl font-medium tabular-nums">{driver?.value != null ? px(driver.value) : "–"}
+                      <span className={cn("ml-2 text-sm", driver?.change_1w != null && (driver.change_1w >= 0 ? "text-up" : "text-down"))}>{driver?.change_1w != null ? `${pc(driver.change_1w, 2)} 1w` : ""}</span></p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-dim">{asset}/USDT{pick?.asset_class === "gold" ? ", one token is one troy ounce of gold" : ""}</p>
+                    <p className="font-mono text-2xl font-medium tabular-nums">{px(t?.price ?? f?.price)}
+                      <span className={cn("ml-2 text-sm", t && (t.ch >= 0 ? "text-up" : "text-down"))}>{t ? pc(t.ch, 2) : ""}</span></p>
+                  </>
+                )}
               </div>
               {f?.frames && (
                 <dl className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
@@ -180,17 +233,19 @@ export default function Markets() {
             </header>
             <div className="flex flex-wrap items-center gap-1.5 border-b border-line px-3 py-2">
               <div className="flex rounded-md bg-sunk p-0.5">
-                {TFS.map((x) => (
+                {TFS.filter((x) => !index || x === "1d" || x === "1w").map((x) => (
                   <button key={x} type="button" onClick={() => setTf(x)} aria-pressed={tf === x}
                     className={cn("h-6 rounded-[5px] px-2.5 text-xs font-medium", tf === x ? "bg-raised text-fg shadow-sm" : "text-dim hover:text-fg")}>{x}</button>
                 ))}
               </div>
               <span className="mx-1 h-5 w-px bg-line" />
               <Toggle on={ov.ema} onClick={() => setOv({ ...ov, ema: !ov.ema })} swatch="var(--ema20)">EMA 20/50/200</Toggle>
-              <Toggle on={ov.volume} onClick={() => setOv({ ...ov, volume: !ov.volume })}>Volume</Toggle>
-              <Toggle on={ov.levels} onClick={() => setOv({ ...ov, levels: !ov.levels })} swatch="var(--up)">Desk levels</Toggle>
-              <Toggle on={ov.patterns} onClick={() => setOv({ ...ov, patterns: !ov.patterns })} swatch="var(--ema200)">Patterns</Toggle>
-              <Toggle on={ov.plans} onClick={() => setOv({ ...ov, plans: !ov.plans })} swatch="var(--brand)">Plans &amp; trades</Toggle>
+              {!index && <Toggle on={ov.volume} onClick={() => setOv({ ...ov, volume: !ov.volume })}>Volume</Toggle>}
+              {!index && <Toggle on={ov.levels} onClick={() => setOv({ ...ov, levels: !ov.levels })} swatch="var(--up)">Desk levels</Toggle>}
+              {SCALES.filter((s) => !index || s.key !== "short").map((s) => (
+                <Toggle key={s.key} on={scales[s.key]} onClick={() => setScales({ ...scales, [s.key]: !scales[s.key] })} swatch="var(--ema200)">{s.label}</Toggle>
+              ))}
+              {!index && <Toggle on={ov.plans} onClick={() => setOv({ ...ov, plans: !ov.plans })} swatch="var(--brand)">Plans &amp; trades</Toggle>}
               <Toggle on={ov.mine} onClick={() => setOv({ ...ov, mine: !ov.mine })} swatch="var(--ema50)">My levels</Toggle>
               <Button size="sm" variant={drawing ? "default" : "outline"} className="ml-auto h-7 gap-1.5 text-xs" onClick={() => { setDrawing(!drawing); setPending(null); }}>
                 <Crosshair className="size-3.5" />{drawing ? "Click the chart to place it" : "Draw level"}
@@ -205,31 +260,36 @@ export default function Markets() {
               </form>
             )}
             <div className="h-[56vh] min-h-[360px]">
-              <MarketChart asset={asset} tf={tf} overlay={ov} lines={lines} markers={markers} segments={segments} boxes={boxes} drawing={drawing} onPick={setPending} onHover={setHover} />
+              <MarketChart asset={asset} tf={tf} overlay={index ? { ...ov, volume: false } : ov} lines={lines} markers={markers} segments={segments} boxes={boxes} drawing={drawing} onPick={setPending} onHover={setHover} />
             </div>
           </section>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Box title="The desk's chart read" right={tech && <span className="text-xs text-dim">Tech analyst, {new Date(tech.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}>
               {techRead ? <Prose html={techRead.replace(/^## (.*)$/m, "").trim().split("\n").map((l) => `<p>${l.replace(/</g, "&lt;")}</p>`).join("")} className="text-[13px]" />
-                : <p className="text-sm text-dim">No chart read for {asset} in the latest run. Run the desk to get one.</p>}
+                : !index && <p className="text-sm text-dim">No chart read for {asset} in the latest run. Run the desk to get one.</p>}
               {r && <p className="mt-3 rounded-md bg-sunk px-3 py-2 text-[13px]">{r.headline}</p>}
-              {shape && <p className="mt-2 text-[13px]"><span className="text-dim">Pattern {frame}:</span> {shape.pattern}, price {shape.position}</p>}
+              {shapes.length > 0 && (
+                <ul className="mt-2 space-y-1 text-[13px]">
+                  {shapes.map((s) => <li key={s.key}><span className="text-dim">{s.label} ({s.tf}):</span> {s.shape!.pattern}, price {s.shape!.position}</li>)}
+                  {!!pat?.levels.length && <li><span className="text-dim">Weekly levels:</span> {pat.levels.map((l) => `${px(l.price)} (${l.touches}×)`).join(", ")}</li>}
+                </ul>
+              )}
             </Box>
-            <Box title={`Plans and trades on ${asset}`}>
+            {!index && <Box title={`Plans and trades on ${asset}`}>
               {!plans.length && !open.length && !closed.length && <p className="text-sm text-dim">Nothing yet on {asset}.</p>}
               <ul className="space-y-2 text-[13px]">
                 {open.map((p) => <li key={`o${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> open at {px(p.entry_price)}</span><span className="font-mono text-dim">stop {px(p.stop)}, target {px(p.take_profit)}</span></li>)}
                 {plans.slice(0, 6).map((p) => <li key={`p${p.id}`} className="flex justify-between gap-2"><span><b className={p.side === "long" ? "text-up" : "text-down"}>{p.side}</b> plan, {p.status}</span><span className="font-mono text-dim">{px(p.entry)} / {px(p.stop)} / {px(p.take_profit)}</span></li>)}
                 {closed.slice(0, 5).map((p) => <li key={`c${p.id}`} className="flex justify-between gap-2"><span>{p.side} closed, {p.exit_reason}</span><span className={cn("font-mono", p.pnl >= 0 ? "text-up" : "text-down")}>{p.pnl >= 0 ? "+" : ""}{Number(p.pnl).toFixed(2)}</span></li>)}
               </ul>
-            </Box>
+            </Box>}
           </div>
-          <Positioning asset={asset} />
+          {!index && <Positioning asset={asset} />}
         </div>
 
         <div className="space-y-4">
-          <Box title={`Signals, ${asset}`} pad={false}>
+          {!index && <Box title={`Signals, ${asset}`} pad={false}>
             {r ? (
               <dl className="divide-y divide-line/60">
                 {r.lines.map((l) => (
@@ -243,7 +303,7 @@ export default function Markets() {
                 ))}
               </dl>
             ) : <p className="p-4 text-sm text-dim">No snapshot for {asset} yet. It appears after the next desk run.</p>}
-          </Box>
+          </Box>}
           <Box title="My levels and notes" right={<span className="text-xs text-dim">The desk reads these</span>}>
             <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); if (note.trim()) { d.addNote({ kind: "idea", asset, text: note }); setNote(""); } }}>
               <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={`Note on ${asset}`} className="min-h-16 text-sm" />

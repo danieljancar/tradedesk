@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Box, Page } from "@/components/shell";
 import { GLOSSARY } from "@/lib/learn";
-import { api } from "@/lib/api";
+import { useApi } from "@/lib/query";
 import { cn } from "@/lib/utils";
 
 function StatTable({ title, rows }: { title: string; rows: any[] }) {
@@ -30,8 +31,8 @@ function StatTable({ title, rows }: { title: string; rows: any[] }) {
 
 export default function Learn() {
   const [q, setQ] = useState("");
-  const [stats, setStats] = useState<any>(undefined);
-  useEffect(() => { api<any>("/api/learning").then(setStats).catch(() => setStats(null)); }, []);
+  const { data, isPending, isError } = useApi<any>("/api/learning", { stale: 300_000 });
+  const stats = isPending ? undefined : isError ? null : data;
   const items = useMemo(() => Object.entries(GLOSSARY).sort((a, b) => a[1].term.localeCompare(b[1].term)), []);
   const shown = items.filter(([, g]) => !q || `${g.term} ${g.short} ${g.long ?? ""}`.toLowerCase().includes(q.toLowerCase()));
   const GROUPS: [string, string][] = [["by_confidence", "By confidence"], ["by_side", "Long vs short"], ["by_asset", "By coin"], ["by_horizon", "By horizon"], ["by_decision", "Taken, passed, rejected"]];
@@ -60,7 +61,7 @@ export default function Learn() {
         </Box>
         <div className="space-y-4">
           <Box title="Learnings">
-            {stats === undefined && <p className="text-sm text-dim">Loading…</p>}
+            {stats === undefined && <div className="space-y-2"><Skeleton className="h-4 w-2/3 bg-sunk" /><Skeleton className="h-24 bg-sunk" /></div>}
             {stats === null && (
               <p className="text-[13px] leading-relaxed text-dim">
                 Not enough history yet. Every idea the desk has, taken or not, gets replayed on real candles once it resolves.

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { api, useInterval, type Candle } from "@/lib/api";
+import { type Candle } from "@/lib/api";
+import { useApi } from "@/lib/query";
+import { Skeleton } from "@/components/ui/skeleton";
 import { pc } from "@/lib/learn";
 import { cn } from "@/lib/utils";
 
@@ -85,9 +87,10 @@ export function DriverCard({ d }: { d: Driver }) {
   );
 }
 
+const NO_CANDLES: Candle[] = [];
+
 export function Compare({ sp }: { sp?: Driver }) {
-  const [btc, setBtc] = useState<Candle[]>([]);
-  useEffect(() => { api<Candle[]>("/api/candles/BTC?tf=1d&limit=120").then(setBtc).catch(() => {}); }, []);
+  const btc = useApi<Candle[]>("/api/candles/BTC?tf=1d&limit=120", { stale: 300_000 }).data ?? NO_CANDLES;
   const data = useMemo(() => {
     if (!btc.length || !sp?.series.length) return [];
     const spMap = new Map(sp.series.map((p) => [p.d, p.v]));
@@ -141,13 +144,13 @@ export function FearGreed({ series }: { series: Point[] }) {
 }
 
 export function OverviewView() {
-  const [m, setM] = useState<Macro | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const load = () => api<Macro>("/api/macro").then((x) => { setM(x); setErr(null); }).catch((e) => setErr(e.message));
-  useEffect(() => { load(); }, []);
-  useInterval(load, 15 * 60 * 1000);
-  if (err && !m) return <p className="p-6 text-center text-xs text-dim">Macro data unavailable: {err}</p>;
-  if (!m) return <div className="absolute inset-0 animate-pulse bg-sunk/30" />;
+  const { data: m, error } = useApi<Macro>("/api/macro", { every: 900_000, stale: 300_000 });
+  if (error && !m) return <p className="p-6 text-center text-xs text-dim">Macro data unavailable: {error.message}</p>;
+  if (!m) return (
+    <div className="absolute inset-0 grid content-start gap-3 p-4 md:grid-cols-5">
+      {Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="h-16 bg-sunk" />)}
+    </div>
+  );
   const r = m.regime;
   const tone = r.label === "Risk-on" ? "text-up" : r.label === "Risk-off" ? "text-down" : "text-warn";
   const head = m.drivers.filter((d) => d.tilt < 0).map((d) => d.name);

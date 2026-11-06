@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { api, useDesk, useInterval } from "@/lib/api";
+import { api, useDesk } from "@/lib/api";
+import { useApi } from "@/lib/query";
 
 export type Note = { id: number; ts: string; kind: string; asset: string | null; price: number | null; text: string };
 export type Headline = { title: string; link: string; source: string; category: string; ts: number; image?: string | null; summary?: string };
@@ -22,6 +23,8 @@ type Ctx = ReturnType<typeof useDesk> & {
   universe: UniverseAsset[];
 };
 
+const NO_NEWS: Headline[] = [];
+
 const DeskCtx = createContext<Ctx | null>(null);
 
 export async function send(path: string, method = "POST", body?: unknown) {
@@ -38,18 +41,14 @@ export async function send(path: string, method = "POST", body?: unknown) {
 export function DeskProvider({ children }: { children: ReactNode }) {
   const desk = useDesk();
   const [notes, setNotes] = useState<Note[]>([]);
-  const [news, setNews] = useState<Headline[]>([]);
-  const [macro, setMacro] = useState<any>(null);
   const [universe, setUniverse] = useState<UniverseAsset[]>([]);
   const runId = desk.runId;
   const scanned = desk.events.some((e) => e.actor === "scanner" && e.kind === "output");
 
   const loadNotes = useCallback(() => api<Note[]>("/api/notes").then(setNotes).catch(() => {}), []);
-  const loadNews = useCallback(() => api<Headline[]>("/api/news").then(setNews).catch(() => {}), []);
-  const loadMacro = useCallback(() => api<any>("/api/macro").then(setMacro).catch(() => {}), []);
-  useEffect(() => { loadNotes(); loadNews(); loadMacro(); }, [loadNotes, loadNews, loadMacro]);
-  useInterval(loadNews, 120_000);
-  useInterval(loadMacro, 900_000);
+  const news = useApi<Headline[]>("/api/news", { every: 120_000 }).data ?? NO_NEWS;
+  const macro = useApi<any>("/api/macro", { every: 900_000, stale: 300_000 }).data ?? null;
+  useEffect(() => { loadNotes(); }, [loadNotes]);
   useEffect(() => {
     if (!runId) return;
     api<UniverseAsset[]>(`/api/universe?run_id=${encodeURIComponent(runId)}`).then(setUniverse).catch(() => setUniverse([]));

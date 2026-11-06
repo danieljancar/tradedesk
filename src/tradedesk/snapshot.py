@@ -43,7 +43,7 @@ def frame_line(name: str, candles: list[Candle]) -> tuple[str, dict]:
 def asset_block(md: MarketData, symbol: str) -> tuple[str, dict]:
     daily = md.klines(symbol, "1d", 260)
     four = md.klines(symbol, "4h", 200)
-    weekly = md.klines(symbol, "1w", 80)
+    weekly = md.klines(symbol, "1w", 260)
     price = four[-1].close
     closes = [c.close for c in daily]
 
@@ -61,7 +61,12 @@ def asset_block(md: MarketData, symbol: str) -> tuple[str, dict]:
     sup, res = swing_levels(daily[-120:])
     sup4, res4 = swing_levels(four[-120:])
     recent = four[-30:]
-    shapes = {"4h": patterns.find(four), "1d": patterns.find(daily)}
+    shapes = {
+        "4h": patterns.find(four),
+        "1d": patterns.find(daily),
+        "1w": patterns.find(weekly, lookback=260, width=4),
+    }
+    long_levels = patterns.levels(weekly)
     lines = [
         f"## {symbol} price {num(price)} | 24h {change(1)} 7d {change(7)} 30d {change(30)} "
         f"90d {change(90)}",
@@ -74,6 +79,11 @@ def asset_block(md: MarketData, symbol: str) -> tuple[str, dict]:
         f"{num(max(c.high for c in recent))}",
         "daily closes (old to new): " + " ".join(num(c) for c in closes[-14:]),
         *(patterns.line(tf, p, num) for tf, p in shapes.items()),
+        "levels 1w, turned at more than once: "
+        + (
+            ", ".join(f"{num(x['price'])} {x['kind']} ({x['touches']}x)" for x in long_levels)
+            or "none"
+        ),
     ]
     deriv = md.derivatives(symbol)
     if deriv:

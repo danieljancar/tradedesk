@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Box, Page } from "@/components/shell";
+import { Box, Page, PageSkeleton } from "@/components/shell";
 import { Term } from "@/components/term";
-import { api } from "@/lib/api";
+import { useApi } from "@/lib/query";
 import { pc, px } from "@/lib/learn";
 import { cn } from "@/lib/utils";
 
@@ -40,11 +39,9 @@ function Stat({ label, term, value, sub, tone }: { label: string; term?: string;
 }
 
 export default function Performance() {
-  const [r, setR] = useState<Report | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => { api<Report>("/api/analytics").then(setR).catch((e) => setError(e.message)); }, []);
-  if (error) return <Page><Box title="Performance"><p className="text-sm text-down">Couldn't load the numbers: {error}</p></Box></Page>;
-  if (!r) return <Page><div className="h-40 animate-pulse rounded-xl bg-panel" /></Page>;
+  const { data: r, error } = useApi<Report>("/api/analytics", { every: 120_000 });
+  if (error && !r) return <Page><Box title="Performance"><p className="text-sm text-down">Couldn't load the numbers: {error.message}</p></Box></Page>;
+  if (!r) return <PageSkeleton />;
 
   const m = r.metrics, t = r.trades;
   const tone = (n?: number | null) => (n == null ? "" : n >= 0 ? "text-up" : "text-down");

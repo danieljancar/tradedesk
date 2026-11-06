@@ -3,8 +3,9 @@ import {
   CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineStyle, createChart, createSeriesMarkers,
   type IChartApi, type ISeriesApi, type SeriesMarker, type UTCTimestamp,
 } from "lightweight-charts";
-import { api, type Candle } from "@/lib/api";
+import { type Candle } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useApi } from "@/lib/query";
 
 const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
 export function cssColor(name: string, alpha = 1) {
@@ -27,8 +28,8 @@ function ema(values: number[], period: number) {
   });
 }
 
-export type Overlay = { ema: boolean; volume: boolean; levels: boolean; plans: boolean; mine: boolean; patterns: boolean };
-export type SegmentSpec = { t1: number; p1: number; t2: number; p2: number; color: string };
+export type Overlay = { ema: boolean; volume: boolean; levels: boolean; plans: boolean; mine: boolean };
+export type SegmentSpec = { t1: number; p1: number; t2: number; p2: number; color: string; width?: 1 | 2 | 3; style?: "solid" | "dashed" | "dotted"; extend?: boolean };
 export type BoxSpec = { from: number; entry: number; stop: number; target: number; up: string; down: string };
 export type LineSpec = { price: number; title: string; color: string; style?: "solid" | "dashed" | "dotted"; width?: 1 | 2 | 3 };
 export type MarkerSpec = { time: number; text: string; color: string; position: "aboveBar" | "belowBar"; shape: "arrowUp" | "arrowDown" | "circle" };
@@ -45,8 +46,10 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
   pickRef.current = onPick;
   const drawRef = useRef(drawing);
   drawRef.current = drawing;
-  const [data, setData] = useState<Candle[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const limit = tf === "1h" || tf === "4h" ? 400 : tf === "1d" ? 365 : 500;
+  const candles = useApi<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=${limit}`, { every: 60_000 });
+  const data = candles.data ?? null;
+  const err = candles.data ? null : (candles.error?.message ?? null);
   const [scheme, setScheme] = useState(0);
 
   useEffect(() => {
@@ -54,16 +57,6 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     return () => mo.disconnect();
   }, []);
-
-  useEffect(() => {
-    let alive = true;
-    setData(null);
-    setErr(null);
-    const limit = tf === "1h" ? 400 : tf === "4h" ? 400 : tf === "1d" ? 365 : 200;
-    api<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=${limit}`).then((d) => alive && setData(d)).catch((e) => alive && setErr(e.message));
-    const t = setInterval(() => api<Candle[]>(`/api/candles/${asset}?tf=${tf}&limit=${limit}`).then((d) => alive && setData(d)).catch(() => {}), 60_000);
-    return () => { alive = false; clearInterval(t); };
-  }, [asset, tf]);
 
   useEffect(() => {
     if (!data || !box.current) return;
@@ -112,11 +105,15 @@ export function MarketChart({ asset, tf, overlay, lines, markers, segments = [],
       .flatMap((m) => { const bt = barOf(m.time); return bt == null ? [] : [{ time: bt as UTCTimestamp, position: m.position, shape: m.shape, color: m.color, text: m.text }]; })
       .sort((a, b) => a.time - b.time);
     if (ms.length) createSeriesMarkers(candles, ms);
+    // a trendline from a longer timeframe gets cut to the bars on screen and, if asked, runs on to the last bar
+    const first = data[0].time, last = data[data.length - 1].time;
     for (const sg of segments) {
-      const a = barOf(sg.t1), b = barOf(sg.t2);
-      if (a == null || b == null || a >= b) continue;
-      chart.addSeries(LineSeries, { color: sg.color, lineWidth: 2, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
-        .setData([{ time: a as UTCTimestamp, value: sg.p1 }, { time: b as UTCTimestamp, value: sg.p2 }]);
+      const from = Math.max(sg.t1, first), to = sg.extend ? last : Math.min(sg.t2, last);
+      const a = barOf(from), b = barOf(to);
+      if (a == null || b == null || a >= b || sg.t2 === sg.t1) continue;
+      const at = (ts: number) => sg.p1 + ((sg.p2 - sg.p1) * (ts - sg.t1)) / (sg.t2 - sg.t1);
+      chart.addSeries(LineSeries, { color: sg.color, lineWidth: sg.width ?? 2, lineStyle: styles[sg.style ?? "dashed"], priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+        .setData([{ time: a as UTCTimestamp, value: at(a) }, { time: b as UTCTimestamp, value: at(b) }]);
     }
     // plan and position zones, drawn on a canvas over the chart: green to the target, red to the stop
     let frame = 0;

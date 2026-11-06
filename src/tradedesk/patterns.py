@@ -89,3 +89,38 @@ def line(frame: str, p: dict | None, num) -> str:
         f"(now {num(u['p_end'])}), lower line {num(lo['p1'])} to {num(lo['p2'])} "
         f"(now {num(lo['p_end'])}), price {p['position']}"
     )
+
+
+# timeframe, bars to look back, swing width
+SCALES = {"short": ("4h", 120, 3), "mid": ("1d", 240, 5), "long": ("1w", 260, 4)}
+
+
+def levels(candles: Sequence[Candle], width: int = 4, keep: int = 6) -> list[dict]:
+    """Horizontal levels the price turned at more than once, strongest first. Swing points
+    within half an ATR of each other count as the same level."""
+    highs, lows = pivots(candles, width)
+    a = atr(candles) or 0
+    if not a:
+        return []
+    points = sorted([(p, t) for _, t, p in highs] + [(p, t) for _, t, p in lows])
+    groups: list[list[tuple[float, int]]] = []
+    for price, t in points:
+        if groups and price - groups[-1][-1][0] <= a / 2:
+            groups[-1].append((price, t))
+        else:
+            groups.append([(price, t)])
+    close = candles[-1].close
+    out = []
+    for g in groups:
+        if len(g) < 2:
+            continue
+        price = sum(x for x, _ in g) / len(g)
+        out.append(
+            {
+                "price": price,
+                "touches": len(g),
+                "since": min(t for _, t in g) // 1000,
+                "kind": "support" if price < close else "resistance",
+            }
+        )
+    return sorted(out, key=lambda x: (-x["touches"], abs(x["price"] - close)))[:keep]

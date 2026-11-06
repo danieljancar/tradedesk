@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { type ReactNode, useEffect, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Crash } from "@/components/crash";
 import { Shell } from "@/components/shell";
+import { queryClient } from "@/lib/query";
 import { TermLayer } from "@/components/term";
 import { DeskProvider } from "@/lib/desk-context";
 import Overview from "@/pages/overview";
@@ -28,15 +31,21 @@ function useTheme() {
   return { dark, toggle };
 }
 
+function Pages({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <Crash reset={pathname}><Routes>{children}</Routes></Crash>;
+}
+
 export default function App() {
   const { dark, toggle } = useTheme();
   return (
+    <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <TooltipProvider>
         <DeskProvider>
           <TermLayer>
             <Shell dark={dark} toggle={toggle}>
-              <Routes>
+              <Pages>
                 <Route path="/" element={<Overview />} />
                 <Route path="/portfolio" element={<Portfolio />} />
                 <Route path="/markets" element={<Markets />} />
@@ -48,12 +57,13 @@ export default function App() {
                 <Route path="/learn" element={<Learn />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              </Pages>
             </Shell>
             <Toaster position="top-center" theme={dark ? "dark" : "light"} />
           </TermLayer>
         </DeskProvider>
       </TooltipProvider>
     </BrowserRouter>
+    </QueryClientProvider>
   );
 }
