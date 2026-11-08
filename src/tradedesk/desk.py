@@ -276,6 +276,8 @@ class Desk:
             f"{limits.min_reward_risk}, max {limits.max_open_positions} positions, "
             f"min confidence {limits.min_confidence}, shorts "
             f"{'allowed' if self.settings.market == 'futures' else self._shorts_note()}",
+            f"entries within {limits.max_entry_distance_pct}% of price, stops at least "
+            f"{limits.min_stop_atr} x ATR from entry (4h ATR for short horizon, 1d otherwise)",
             "max hold days: "
             + ", ".join(f"{k} {v}" for k, v in self.settings.hold_days.model_dump().items()),
             trailing_line(self.settings),
@@ -357,7 +359,9 @@ class Desk:
             f" of {limits.max_total_risk_pct}%)",
             f"rules: risk {limits.risk_per_trade_pct}% per trade{conviction_note(limits)}, "
             f"min reward/risk {limits.min_reward_risk}, max {limits.max_open_positions} positions, "
-            f"leverage up to {limits.max_leverage}x, one position per coin, shorts allowed",
+            f"leverage up to {limits.max_leverage}x, one position per coin, shorts allowed, "
+            f"entries within {limits.max_entry_distance_pct}% of price, stops at least "
+            f"{limits.min_stop_atr} x ATR (4h for short horizon, 1d otherwise)",
         ]
         blocks = risk.account_blocks(self.settings, b)
         if blocks:

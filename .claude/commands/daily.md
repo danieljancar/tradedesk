@@ -77,7 +77,7 @@ Rules for the file:
 
 Then run `uv run desk check <run>/plans.json`.
 
-If an idea was rejected for a mechanical reason you can fix honestly (stop past a level, entry on the wrong side), fix it once and check again with a new file `plans-2.json` holding only that idea. Never loosen a stop or move a target past a level just to pass. Don't retry a rejection for confidence, open risk, daily loss or drawdown.
+Design ideas inside the rules in book.md (entry distance, stop against ATR, reward/risk) before the check. If an idea was still rejected for a mechanical reason you can fix honestly (stop past a level, entry on the wrong side or too far from price), fix it once with another real level or a market entry and check again with a new file `plans-2.json` holding only that idea. Never loosen a stop or move a target past a level just to pass. Don't retry a rejection for confidence, open risk, daily loss or drawdown.
 
 ## 5. Report and orders
 
