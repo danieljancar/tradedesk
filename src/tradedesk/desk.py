@@ -57,6 +57,7 @@ class Desk:
         self._broker = broker
         self.listeners: list[Callable[[dict], None]] = []
         self.linked: Desk | None = None
+        self.parent: Desk | None = None
         self.events = db
         self.label = ""
 
@@ -65,6 +66,7 @@ class Desk:
         futures.events = self.db
         futures.listeners = self.listeners
         futures.label = "Futures: "
+        futures.parent = self
         self.linked = futures
 
     def venue_of(self, idea: TradeIdea) -> "Desk":
@@ -173,6 +175,9 @@ class Desk:
         return run_dir / "universe.md"
 
     def run_assets(self) -> list[dict]:
+        # the scan is saved with the main desk; a linked futures desk trades the same list
+        if self.parent is not None:
+            return self.parent.run_assets()
         run_id = self.run_id()
         saved = self.db.run_universe(run_id) if run_id else None
         if not saved or not self.settings.universe.enabled:

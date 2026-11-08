@@ -168,3 +168,9 @@ def test_samples_before_a_transfer_are_not_a_drawdown(pair):
     pair.db.record_equity(650, "2026-11-05T22:00:01+00:00")
     pair.db.record_equity(640, "2026-11-05T22:10:00+00:00")
     assert pair.db.peak_equity() == pytest.approx(650)
+
+
+def test_futures_desk_trades_the_scanned_universe(pair):
+    pair.settings.universe.enabled = True
+    pair.db.save_universe(pair.run_id(), [{"asset": "XRP", "source": "scan"}])
+    assert [a["asset"] for a in pair.linked.run_assets()] == ["XRP"]
