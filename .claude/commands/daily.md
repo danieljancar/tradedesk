@@ -72,6 +72,8 @@ Rules for the file:
 - Stops sit beyond a real level from technical.md. Targets sit at a real level. Reward to risk must clear the minimum in book.md.
 - You never set size or leverage. The risk engine does.
 - A limit entry for a long sits at or below the current price, for a short at or above.
+- Pick the entry by the trend. When 4h and 1d point the same way and momentum agrees, enter with it: market, or a limit at a level within about 1 ATR of price. Waiting for a deep pullback in a clean trend usually means no fill. Save deep limit entries for ranges and for counter-trend ideas.
+- Several small trades beat one big one. Take the setups that clear the rules even at low confidence; the risk engine sizes them.
 - Use position_actions only to close or tighten open positions listed in book.md. Stops only move in the trade's favor.
 - Zero ideas is a valid answer.
 
