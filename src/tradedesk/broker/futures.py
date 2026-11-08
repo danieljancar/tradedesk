@@ -103,17 +103,45 @@ class FuturesBroker:
         symbol, side, cid = plan["symbol"], plan["side"], f"desk-{plan['id']}"
         self._prepare(symbol, plan["leverage"] or 1)
         order = self._market(symbol, "BUY" if side == "long" else "SELL", plan["qty"], cid=cid)
-        if not float(order.get("executedQty") or 0):
-            order = self._order(symbol, cid)
-        fill, qty = float(order["avgPrice"]), float(order["executedQty"])
-        if not qty:
-            raise RuntimeError(f"market order for plan {plan['id']} did not fill")
+        # stop and target first: they close the whole position and need no fill details, so
+        # whatever goes wrong reading the fill afterwards, the position is never unprotected
         try:
             refs = self._protect(symbol, side, plan["stop"], plan["take_profit"])
         except Exception:
-            self._market(symbol, "SELL" if side == "long" else "BUY", qty, reduce=True)
+            self._flatten(symbol)
             raise
+        fill, qty = self._filled(symbol, cid, order)
+        if not qty:
+            for algo_id in refs.values():
+                self._cancel_algo(algo_id)
+            raise RuntimeError(f"market order for plan {plan['id']} did not fill")
         return Placed(open=True, fill_price=fill, qty=qty, refs=refs)
+
+    def _filled(self, symbol: str, cid: str, order: dict) -> tuple[float, float]:
+        """Fill price and quantity. The order answer can come back before the match, without
+        avgPrice; then the order is asked again and, last, the position itself."""
+        for attempt in range(4):
+            qty = float(order.get("executedQty") or 0)
+            if qty:
+                price = float(order.get("avgPrice") or 0) or (
+                    float(order.get("cumQuote") or 0) / qty
+                )
+                if price:
+                    return price, qty
+            if attempt < 3:
+                time.sleep(0.5)
+                order = self._order(symbol, cid)
+        for p in self.client.signed("GET", "/fapi/v3/positionRisk", symbol=symbol):
+            amt = abs(float(p.get("positionAmt") or 0))
+            if amt:
+                return float(p["entryPrice"]), amt
+        return 0.0, 0.0
+
+    def _flatten(self, symbol: str) -> None:
+        for p in self.client.signed("GET", "/fapi/v3/positionRisk", symbol=symbol):
+            amt = float(p.get("positionAmt") or 0)
+            if amt:
+                self._market(symbol, "SELL" if amt > 0 else "BUY", abs(amt), reduce=True)
 
     def place(self, plan: dict) -> Placed:
         if plan["entry_type"] == "market":

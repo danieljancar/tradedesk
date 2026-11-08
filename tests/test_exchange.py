@@ -98,6 +98,9 @@ def test_futures_closes_position_when_stop_fails(settings):
     respx.post(f"{FUT}/fapi/v1/algoOrder").mock(
         return_value=httpx.Response(400, json={"code": -2021, "msg": "would trigger"})
     )
+    respx.get(f"{FUT}/fapi/v3/positionRisk").mock(
+        return_value=httpx.Response(200, json=[{"positionAmt": "0.5", "entryPrice": "100"}])
+    )
     broker = FuturesBroker(s, Client(FUT, "k", "s"), FakeMarket())
     with pytest.raises(BinanceError):
         broker.place(plan(entry_type="market"))
@@ -212,6 +215,9 @@ def test_futures_cancels_stop_when_target_fails(settings):
     cancel = respx.delete(f"{FUT}/fapi/v1/algoOrder").mock(
         return_value=httpx.Response(200, json={})
     )
+    respx.get(f"{FUT}/fapi/v3/positionRisk").mock(
+        return_value=httpx.Response(200, json=[{"positionAmt": "0.5", "entryPrice": "100"}])
+    )
     broker = FuturesBroker(s, Client(FUT, "k", "s"), FakeMarket())
     with pytest.raises(BinanceError):
         broker.place(plan(entry_type="market"))
@@ -228,3 +234,30 @@ def test_futures_trades_cross_in_multi_assets_mode(settings):
     broker = FuturesBroker(s, Client(FUT, "k", "s"), FakeMarket())
     broker._prepare("SOLUSDT", 3)
     assert leverage.called
+
+
+@respx.mock
+def test_futures_protects_first_when_the_fill_reads_late(settings, monkeypatch):
+    monkeypatch.setattr("tradedesk.broker.futures.time.sleep", lambda _: None)
+    s = settings.model_copy(update={"market": Market.FUTURES})
+    respx.post(f"{FUT}/fapi/v1/marginType").mock(return_value=httpx.Response(200, json={}))
+    respx.post(f"{FUT}/fapi/v1/leverage").mock(return_value=httpx.Response(200, json={}))
+    # the order answer has no avgPrice and no fill yet, like the live ONE order
+    respx.post(f"{FUT}/fapi/v1/order").mock(
+        return_value=httpx.Response(200, json={"orderId": 1, "status": "NEW"})
+    )
+    respx.get(f"{FUT}/fapi/v1/order").mock(
+        return_value=httpx.Response(
+            200, json={"status": "FILLED", "executedQty": "8841", "cumQuote": "18.0"}
+        )
+    )
+    algo = respx.post(f"{FUT}/fapi/v1/algoOrder").mock(
+        side_effect=[
+            httpx.Response(200, json={"algoId": 11}),
+            httpx.Response(200, json={"algoId": 12}),
+        ]
+    )
+    broker = FuturesBroker(s, Client(FUT, "k", "s"), FakeMarket())
+    placed = broker.place(plan(entry_type="market"))
+    assert algo.call_count == 2
+    assert placed.qty == 8841 and abs(placed.fill_price - 18.0 / 8841) < 1e-12
