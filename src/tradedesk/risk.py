@@ -161,7 +161,8 @@ def check(
     leverage = 1
     if settings.market is Market.FUTURES:
         # isolated margin: each position gets its own slice of the account as collateral
-        slot = book.active_equity / limits.max_open_positions
+        share = limits.margin_slot_pct or 100 / limits.max_open_positions
+        slot = book.active_equity * share / 100
         cap = min(cap * limits.max_leverage, slot * limits.max_leverage)
         qty = min(qty, cap / entry)
         leverage = max(1, min(limits.max_leverage, math.ceil(qty * entry / slot)))

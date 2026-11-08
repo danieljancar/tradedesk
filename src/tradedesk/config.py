@@ -35,6 +35,9 @@ class RiskLimits(BaseModel):
     max_total_risk_pct: float = Field(4.0, gt=0, le=20)
     max_position_pct: float = Field(25.0, gt=0, le=100)
     max_leverage: int = Field(3, ge=1, le=20)
+    # futures margin per position as a share of the wallet; unset, it's an even split over
+    # max_open_positions. Leverage is what it takes to fit the position into that margin
+    margin_slot_pct: float | None = Field(None, gt=0, le=100)
     min_reward_risk: float = Field(2.0, ge=1)
     daily_loss_limit_pct: float = Field(3.0, gt=0, le=25)
     max_drawdown_pct: float = Field(15.0, gt=0, le=50)

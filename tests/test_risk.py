@@ -203,3 +203,15 @@ def test_spot_exit_outside_the_price_band_is_refused(settings):
     tight = SymbolRules(tick=0.01, step=0.0001, min_qty=0.0001, min_notional=5, sell_down=0.97)
     v = check(idea(), settings, book(), price=100.5, atr=4, rules=tight)
     assert any("lowest sell price" in r for r in v.reasons)
+
+
+def test_margin_slot_does_not_follow_the_position_count(settings):
+    settings.market = Market.FUTURES
+    settings.risk.max_leverage = 10
+    settings.risk.max_position_pct = 100
+    settings.risk.max_open_positions = 20
+    settings.risk.margin_slot_pct = 25
+    v = check(idea(stop=98, take_profit=106), settings, book(), price=100.5, atr=None, rules=RULES)
+    assert v.ok, v.reasons
+    assert v.qty * v.entry / v.leverage <= 1000 * 0.25 + 1e-6
+    assert v.leverage <= 3
