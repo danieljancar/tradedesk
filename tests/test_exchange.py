@@ -261,3 +261,87 @@ def test_futures_protects_first_when_the_fill_reads_late(settings, monkeypatch):
     placed = broker.place(plan(entry_type="market"))
     assert algo.call_count == 2
     assert placed.qty == 8841 and abs(placed.fill_price - 18.0 / 8841) < 1e-12
+
+
+def _futures(settings):
+    s = settings.model_copy(update={"market": Market.FUTURES})
+    respx.post(f"{FUT}/fapi/v1/marginType").mock(return_value=httpx.Response(200, json={}))
+    respx.post(f"{FUT}/fapi/v1/leverage").mock(return_value=httpx.Response(200, json={}))
+    return FuturesBroker(s, Client(FUT, "k", "s"), FakeMarket())
+
+
+@respx.mock
+def test_futures_limit_entry_rests_on_binance_with_stop_and_target(settings):
+    broker = _futures(settings)
+    order = respx.post(f"{FUT}/fapi/v1/order").mock(
+        return_value=httpx.Response(200, json={"orderId": 7, "status": "NEW"})
+    )
+    respx.post(f"{FUT}/fapi/v1/algoOrder").mock(
+        side_effect=[
+            httpx.Response(200, json={"algoId": 11}),
+            httpx.Response(200, json={"algoId": 12}),
+        ]
+    )
+    placed = broker.place(plan(side="short", entry=105.0, stop=110.0, take_profit=90.0))
+    sent = params(order.calls[0])
+    assert sent["type"] == "LIMIT" and sent["side"] == "SELL" and float(sent["price"]) == 105.0
+    assert placed.refs == {"entry": "desk-5", "stop": 11, "target": 12} and not placed.open
+
+
+@respx.mock
+def test_futures_limit_entry_waits_in_the_desk_when_binance_refuses_a_leg(settings):
+    broker = _futures(settings)
+    respx.post(f"{FUT}/fapi/v1/order").mock(return_value=httpx.Response(200, json={"orderId": 7}))
+    respx.post(f"{FUT}/fapi/v1/algoOrder").mock(
+        return_value=httpx.Response(400, json={"code": -4509, "msg": "no position"})
+    )
+    cancel = respx.delete(f"{FUT}/fapi/v1/order").mock(return_value=httpx.Response(200, json={}))
+    respx.get(f"{FUT}/fapi/v1/order").mock(
+        return_value=httpx.Response(200, json={"status": "CANCELED", "executedQty": "0"})
+    )
+    placed = broker.place(plan())
+    assert placed.refs == {"waiting": True} and cancel.called
+
+
+@respx.mock
+def test_futures_resting_entry_fill_keeps_its_legs(settings):
+    broker = _futures(settings)
+    respx.get(f"{FUT}/fapi/v1/order").mock(
+        return_value=httpx.Response(
+            200, json={"status": "FILLED", "executedQty": "0.5", "avgPrice": "99.0"}
+        )
+    )
+    p = plan(exchange=json.dumps({"entry": "desk-5", "stop": 11, "target": 12}))
+    fill = broker.entry_status(p)
+    assert fill.qty == 0.5 and fill.price == 99.0 and fill.refs == {"stop": 11, "target": 12}
+
+
+@respx.mock
+def test_futures_cancel_removes_entry_and_legs(settings):
+    broker = _futures(settings)
+    respx.delete(f"{FUT}/fapi/v1/order").mock(return_value=httpx.Response(200, json={}))
+    respx.get(f"{FUT}/fapi/v1/order").mock(
+        return_value=httpx.Response(200, json={"status": "CANCELED", "executedQty": "0"})
+    )
+    algos = respx.delete(f"{FUT}/fapi/v1/algoOrder").mock(return_value=httpx.Response(200, json={}))
+    p = plan(exchange=json.dumps({"entry": "desk-5", "stop": 11, "target": 12}))
+    assert broker.cancel(p) is None and algos.call_count == 2
+
+
+@respx.mock
+def test_futures_adopt_keeps_existing_stop_and_places_the_target(settings):
+    broker = _futures(settings)
+    respx.get(f"{FUT}/fapi/v3/positionRisk").mock(
+        return_value=httpx.Response(200, json=[{"positionAmt": "8841", "entryPrice": "0.0020046"}])
+    )
+    respx.get(f"{FUT}/fapi/v1/openAlgoOrders").mock(
+        return_value=httpx.Response(
+            200, json=[{"algoId": 31, "orderType": "STOP_MARKET", "side": "SELL"}]
+        )
+    )
+    algo = respx.post(f"{FUT}/fapi/v1/algoOrder").mock(
+        return_value=httpx.Response(200, json={"algoId": 32})
+    )
+    fill = broker.adopt("ONEUSDT", 0.00189, 0.002476)
+    assert fill.qty == 8841 and fill.refs == {"stop": 31, "target": 32}
+    assert params(algo.calls[0])["type"] == "TAKE_PROFIT_MARKET"

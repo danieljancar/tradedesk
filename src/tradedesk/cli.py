@@ -235,6 +235,12 @@ def status() -> None:
 
 
 @app.command()
+def adopt(plan_id: int, futures: bool = False) -> None:
+    """Take over a position that is open on the exchange but missing in the desk."""
+    say(pick(futures).adopt(plan_id))
+
+
+@app.command()
 def close(position_id: int, reason: str = "manual", futures: bool = False) -> None:
     pick(futures).close(position_id, reason)
     say(f"position {position_id} closed")

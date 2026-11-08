@@ -137,6 +137,32 @@ class FuturesBroker:
                 return float(p["entryPrice"]), amt
         return 0.0, 0.0
 
+    def adopt(self, symbol: str, stop: float, target: float) -> Fill | None:
+        """Take over a position already open on Binance: read size and entry, keep the stop and
+        target that are there, place the missing ones."""
+        held = [
+            p
+            for p in self.client.signed("GET", "/fapi/v3/positionRisk", symbol=symbol)
+            if float(p.get("positionAmt") or 0)
+        ]
+        if not held:
+            return None
+        amt, entry = float(held[0]["positionAmt"]), float(held[0]["entryPrice"])
+        exit_side = "SELL" if amt > 0 else "BUY"
+        refs: dict = {}
+        for o in self.client.signed("GET", "/fapi/v1/openAlgoOrders", symbol=symbol):
+            if o.get("side") != exit_side:
+                continue
+            if o.get("orderType") == "STOP_MARKET" and "stop" not in refs:
+                refs["stop"] = o["algoId"]
+            elif o.get("orderType") == "TAKE_PROFIT_MARKET" and "target" not in refs:
+                refs["target"] = o["algoId"]
+        if "stop" not in refs:
+            refs["stop"] = self._conditional(symbol, exit_side, "STOP_MARKET", stop)
+        if "target" not in refs:
+            refs["target"] = self._conditional(symbol, exit_side, "TAKE_PROFIT_MARKET", target)
+        return Fill(price=entry, qty=abs(amt), at=now(), refs=refs)
+
     def _flatten(self, symbol: str) -> None:
         for p in self.client.signed("GET", "/fapi/v3/positionRisk", symbol=symbol):
             amt = float(p.get("positionAmt") or 0)
@@ -146,9 +172,61 @@ class FuturesBroker:
     def place(self, plan: dict) -> Placed:
         if plan["entry_type"] == "market":
             return self._open(plan)
-        return Placed(open=False, refs={"waiting": True})
+        return self._rest(plan)
+
+    def _rest(self, plan: dict) -> Placed:
+        """Limit entry on Binance with stop and target placed next to it, so it fills at its
+        price with the Mac off. If Binance refuses any leg, the plan waits in the desk instead."""
+        symbol, side, cid = plan["symbol"], plan["side"], f"desk-{plan['id']}"
+        self._prepare(symbol, plan["leverage"] or 1)
+        try:
+            self.client.signed(
+                "POST",
+                "/fapi/v1/order",
+                symbol=symbol,
+                side="BUY" if side == "long" else "SELL",
+                type="LIMIT",
+                timeInForce="GTC",
+                quantity=plan["qty"],
+                price=plan["entry"],
+                newClientOrderId=cid,
+            )
+        except BinanceError:
+            return Placed(open=False, refs={"waiting": True})
+        try:
+            refs = self._protect(symbol, side, plan["stop"], plan["take_profit"])
+        except BinanceError:
+            self._cancel_order(symbol, cid)
+            return Placed(open=False, refs={"waiting": True})
+        return Placed(open=False, refs={"entry": cid, **refs})
+
+    def _cancel_order(self, symbol: str, cid: str) -> dict:
+        with suppress(BinanceError):
+            self.client.signed("DELETE", "/fapi/v1/order", symbol=symbol, origClientOrderId=cid)
+        return self._order(symbol, cid)
+
+    def _resting_fill(self, plan: dict, refs: dict, order: dict) -> Fill | None:
+        qty = float(order.get("executedQty") or 0)
+        if not qty:
+            return None
+        price = float(order.get("avgPrice") or 0) or float(order.get("cumQuote") or 0) / qty
+        legs = {k: refs[k] for k in ("stop", "target")}
+        return Fill(price=price or plan["entry"], qty=qty, at=now(), refs=legs)
 
     def entry_status(self, plan: dict) -> Fill | str | None:
+        refs = json.loads(plan.get("exchange") or "{}")
+        if "entry" in refs:
+            order = self._order(plan["symbol"], refs["entry"])
+            if order["status"] == "FILLED":
+                return self._resting_fill(plan, refs, order)
+            if order["status"] in ("CANCELED", "EXPIRED", "REJECTED"):
+                fill = self._resting_fill(plan, refs, order)
+                if fill is None:
+                    for leg in ("stop", "target"):
+                        self._cancel_algo(refs[leg])
+                    return "cancelled"
+                return fill
+            return None
         price = self.price(plan["symbol"])
         sign = 1 if plan["side"] == "long" else -1
         if (price - plan["entry"]) * sign > 0:
@@ -204,16 +282,25 @@ class FuturesBroker:
             start = end + 1
         return out
 
-    def cancel(self, plan: dict) -> None:
-        return None
+    def cancel(self, plan: dict) -> Fill | None:
+        refs = json.loads(plan.get("exchange") or "{}")
+        if "entry" not in refs:
+            return None
+        order = self._cancel_order(plan["symbol"], refs["entry"])
+        fill = self._resting_fill(plan, refs, order)
+        if fill is None:
+            for leg in ("stop", "target"):
+                self._cancel_algo(refs[leg])
+        return fill
 
     def close(self, position: dict) -> Exit:
         refs = json.loads(position["exchange"])
         for leg in ("stop", "target"):
             self._cancel_algo(refs[leg])
         side = "SELL" if position["side"] == "long" else "BUY"
-        order = self._market(position["symbol"], side, position["qty"], reduce=True)
-        price = float(order["avgPrice"])
+        cid = f"desk-close-{position['id']}-{int(time.time())}"
+        order = self._market(position["symbol"], side, position["qty"], reduce=True, cid=cid)
+        price, _ = self._filled(position["symbol"], cid, order)
         sign = 1 if position["side"] == "long" else -1
         return Exit(
             price=price,

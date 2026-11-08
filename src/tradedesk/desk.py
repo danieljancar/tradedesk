@@ -663,6 +663,25 @@ class Desk:
             out += self._also("execute")
         return out
 
+    def adopt(self, plan_id: int) -> str:
+        """Record a position that is open on the exchange but not in the desk, under its plan."""
+        plan = self.db.one("SELECT * FROM plans WHERE id = ?", plan_id)
+        if plan is None:
+            return f"no plan {plan_id}"
+        if self.db.one("SELECT id FROM positions WHERE plan_id = ?", plan_id):
+            return f"plan {plan_id} already has a position"
+        take_over = getattr(self.broker, "adopt", None)
+        if take_over is None:
+            return "only futures positions can be taken over"
+        fill = take_over(plan["symbol"], plan["stop"], plan["take_profit"])
+        if fill is None:
+            return f"no open {plan['symbol']} position on the exchange"
+        position_id = self._open_position(plan, fill)
+        return (
+            f"position {position_id}: {fill.qty:g} {plan['asset']} at {fill.price:g}, "
+            "stop and target linked"
+        )
+
     def _open_position(self, plan: dict, fill: Fill) -> int:
         position_id = self.db.insert(
             "positions",
