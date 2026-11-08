@@ -67,7 +67,7 @@ Write `<run>/plans.json`:
 ```
 
 Rules for the file:
-- horizon is short (days), mid (weeks) or long (months). rating is buy, overweight, hold, underweight or sell.
+- horizon is short (days), mid (weeks) or long (months). It sets the max hold in book.md, so pick it by the thesis: a chart setup is short, a move driven by macro, policy, an event or a trend over weeks is mid or long. rating is buy, overweight, hold, underweight or sell.
 - Prices are plain numbers taken from the reports or snapshot.md: no ranges, no "around", no formulas.
 - Stops sit beyond a real level from technical.md. Targets sit at a real level. Reward to risk must clear the minimum in book.md.
 - You never set size or leverage. The risk engine does.

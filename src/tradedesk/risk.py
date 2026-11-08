@@ -157,7 +157,12 @@ def check(
         risk_amount = max(0.0, budget)
 
     qty = risk_amount / stop_dist if risk_amount > 0 else 0.0
-    cap = book.active_equity * limits.max_position_pct / 100
+    # a high-conviction idea may take a bigger slice, by the same factor its risk grows
+    cap = (
+        book.active_equity
+        * min(100.0, limits.max_position_pct * conviction(settings, idea.confidence))
+        / 100
+    )
     leverage = 1
     if settings.market is Market.FUTURES:
         # isolated margin: each position gets its own slice of the account as collateral

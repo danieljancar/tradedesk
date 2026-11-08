@@ -215,3 +215,16 @@ def test_margin_slot_does_not_follow_the_position_count(settings):
     assert v.ok, v.reasons
     assert v.qty * v.entry / v.leverage <= 1000 * 0.25 + 1e-6
     assert v.leverage <= 3
+
+
+def test_position_cap_grows_with_conviction(settings):
+    settings.risk.max_position_pct = 30
+    settings.risk.risk_per_trade_pct = 5
+    settings.risk.max_total_risk_pct = 20
+    settings.risk.min_confidence = 60
+    settings.risk.confident_at = 80
+    settings.risk.confident_risk_x = 2
+    low = check(idea(confidence=60), settings, book(), price=100.5, atr=None, rules=RULES)
+    high = check(idea(confidence=90), settings, book(), price=100.5, atr=None, rules=RULES)
+    assert low.qty * low.entry <= 300 + 1e-6
+    assert 300 < high.qty * high.entry <= 600 + 1e-6
