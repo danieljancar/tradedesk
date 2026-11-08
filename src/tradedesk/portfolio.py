@@ -23,6 +23,9 @@ CLASSES = {"BTC": "bitcoin", "ETH": "ether", "PAXG": "gold", "XAUT": "gold"}
 PENDING_PLANS = ("proposed", "approved", "placed")
 
 
+FUTURES = "Futures wallet"
+
+
 def asset_class(asset: str) -> str:
     return "cash" if asset in CASH else CLASSES.get(asset, "altcoins")
 
@@ -374,10 +377,16 @@ def state(desk: Desk, fx: dict) -> dict:
     quote_balance = getattr(desk.broker, "quote_balance", None)
     cash = quote_balance() if quote_balance else equity - sum(by_asset.values())
     by_asset[s.quote] = by_asset.get(s.quote, 0.0) + max(0.0, cash)
+    # the futures wallet is part of the account: margin, open shorts and their open profit
+    if desk.linked is not None:
+        futures = desk.linked.broker.equity()
+        equity += futures
+        by_asset[FUTURES] = futures
     total = sum(by_asset.values()) or 1.0
     by_class: dict[str, float] = {}
     for asset, value in by_asset.items():
-        by_class[asset_class(asset)] = by_class.get(asset_class(asset), 0.0) + value
+        kind = "futures" if asset == FUTURES else asset_class(asset)
+        by_class[kind] = by_class.get(kind, 0.0) + value
     rate = fx.get("rate")
 
     def share(value: float, of: float) -> float:

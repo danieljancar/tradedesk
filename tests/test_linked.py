@@ -174,3 +174,14 @@ def test_futures_desk_trades_the_scanned_universe(pair):
     pair.settings.universe.enabled = True
     pair.db.save_universe(pair.run_id(), [{"asset": "XRP", "source": "scan"}])
     assert [a["asset"] for a in pair.linked.run_assets()] == ["XRP"]
+
+
+def test_portfolio_counts_the_futures_wallet(pair):
+    from tradedesk import portfolio
+
+    s = portfolio.state(pair, {"rate": 0.8})
+    spot, fut = pair.broker.equity(), pair.linked.broker.equity()
+    assert s["equity"] == round(spot + fut, 2)
+    assert {"asset": "Futures wallet", "value": round(fut, 2)}.items() <= next(
+        a for a in s["allocation"]["by_asset"] if a["asset"] == "Futures wallet"
+    ).items()

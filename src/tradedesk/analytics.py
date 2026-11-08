@@ -164,6 +164,11 @@ def fx_rate(
     series = FX_SERIES.get(b)
     if q != "USD" or series is None:
         return out | {"note": f"no exchange rate source for {quote} to {base}"}
+    if fetch is None:
+        # Yahoo is live; FRED publishes with about a week's delay and stays as the fallback
+        live = _yahoo_fx(b)
+        if live:
+            return out | {"rate": live[1], "as_of": live[0], "source": "Yahoo Finance"}
     try:
         hit = (fetch or _fred_last)(series)
     except Exception:
@@ -171,6 +176,19 @@ def fx_rate(
     if not hit:
         return out | {"source": f"FRED {series}", "note": f"FRED {series} did not answer"}
     return out | {"rate": hit[1], "as_of": hit[0], "source": f"FRED {series}"}
+
+
+def _yahoo_fx(base: str) -> tuple[str, float] | None:
+    from tradedesk import heatmap
+
+    symbol = f"USD{base}=X"
+    try:
+        row = heatmap._fetch([symbol]).get(symbol)
+    except Exception:
+        return None
+    if not row or not row.get("price"):
+        return None
+    return datetime.now(UTC).date().isoformat(), float(row["price"])
 
 
 def funded(rows: list[dict]) -> list[dict]:
