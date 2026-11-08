@@ -178,8 +178,8 @@ def create_app(desk: Desk) -> FastAPI:
         for r in runs:
             r["call"] = calls.get(r["id"])
         plans = db.all("SELECT * FROM plans ORDER BY created_at")
-        equity = db.all("SELECT ts, value FROM equity ORDER BY ts")
-        start_eq = equity[0]["value"] if equity else settings.paper_equity
+        equity = equity_series(None)
+        start_eq = invested() or (equity[0]["value"] if equity else settings.paper_equity)
         hour = 3_600_000
         candles: dict[str, list] = {}
         for p in plans:
@@ -226,10 +226,12 @@ def create_app(desk: Desk) -> FastAPI:
                 rows.append({**r, "id": f"{prefix}{r['id']}", "venue": d.settings.market.value})
         return rows
 
-    def equity_series() -> list[dict]:
-        rows = db.all("SELECT ts, value FROM equity ORDER BY ts DESC LIMIT 200")[::-1]
+    def equity_series(limit: int | None = 200) -> list[dict]:
+        """Spot and futures together, so transfers between them don't show as moves."""
+        sql = "SELECT ts, value FROM equity ORDER BY ts DESC" + (f" LIMIT {limit}" if limit else "")
+        rows = db.all(sql)[::-1]
         if not desk.linked:
-            return rows
+            return analytics.funded(rows)
         other = desk.linked.db.all("SELECT ts, value FROM equity ORDER BY ts")
         out, i, last = [], 0, 0.0
         for r in rows:
@@ -237,7 +239,7 @@ def create_app(desk: Desk) -> FastAPI:
                 last = other[i]["value"]
                 i += 1
             out.append({"ts": r["ts"], "value": r["value"] + last})
-        return out
+        return analytics.funded(out)
 
     def starting() -> bool:
         """daily.sh holds this lock while it runs, before the agents open the run."""
@@ -478,7 +480,9 @@ def create_app(desk: Desk) -> FastAPI:
     def analytics_report() -> dict:
         """Returns, drawdown, ratios, trade stats and BTC buy and hold over the same window."""
         settings = desk.settings
-        return analytics.report(db, settings, market_data(settings).klines)
+        return analytics.report(
+            db, settings, market_data(settings).klines, rows=equity_series(None)
+        )
 
     @app.get("/api/portfolio")
     def portfolio_state() -> dict:

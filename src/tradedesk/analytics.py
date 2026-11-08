@@ -173,13 +173,23 @@ def fx_rate(
     return out | {"rate": hit[1], "as_of": hit[0], "source": f"FRED {series}"}
 
 
+def funded(rows: list[dict]) -> list[dict]:
+    """Equity from the first sample with money in it. A live account starts at 0 before the
+    deposit, and returns measured from 0 are infinite."""
+    for i, r in enumerate(rows):
+        if r["value"] > 0:
+            return rows[i:]
+    return []
+
+
 def report(
     db: Database,
     settings: Settings,
     klines: Klines | None = None,
     fx: dict | None = None,
+    rows: list[dict] | None = None,
 ) -> dict:
-    rows = db.all("SELECT ts, value FROM equity ORDER BY ts")
+    rows = funded(rows if rows is not None else db.all("SELECT ts, value FROM equity ORDER BY ts"))
     points = daily(rows)
     closed = db.all("SELECT * FROM positions WHERE status = 'closed' ORDER BY closed_at")
     bench, note = [], ""

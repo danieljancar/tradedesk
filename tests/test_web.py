@@ -115,3 +115,12 @@ def test_database_survives_parallel_requests(db):
     with ThreadPoolExecutor(16) as pool:
         assert all(pool.map(work, range(400)))
     assert db.one("SELECT COUNT(*) AS n FROM flows")["n"] == 400
+
+
+def test_report_starts_at_the_money_put_in(settings, db, market):
+    db.record_equity(0.0, ts="2026-11-05T20:00:00+00:00")
+    db.record_equity(1050.0, ts="2026-11-05T21:00:00+00:00")
+    c, _ = client(settings, db, market)
+    rep = c.get("/api/report").json()
+    assert rep["start_equity"] == 1000
+    assert rep["equity"][0]["value"] == 1050
