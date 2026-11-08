@@ -26,7 +26,7 @@ fi
 claude -p "/daily" --output-format json --permission-mode dontAsk --allowedTools \
   "Bash(uv run desk run:*)" "Bash(uv run desk sync)" "Bash(uv run desk snapshot)" \
   "Bash(uv run desk news)" "Bash(uv run desk book)" "Bash(uv run desk post:*)" \
-  "Bash(uv run desk check:*)" "Bash(uv run desk execute)" "Bash(uv run desk status)" \
+  "Bash(uv run desk precheck:*)" "Bash(uv run desk check:*)" "Bash(uv run desk execute)" "Bash(uv run desk status)" \
   "Bash(uv run desk plans:*)" "Bash(uv run desk journal:*)" \
   "Read" "Write" "Agent" "WebSearch" >"$out" 2>>"$log"
 status=$?

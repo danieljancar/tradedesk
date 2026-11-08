@@ -77,9 +77,11 @@ Rules for the file:
 - Use position_actions only to close or tighten open positions listed in book.md. Stops only move in the trade's favor.
 - Zero ideas is a valid answer.
 
-Then run `uv run desk check <run>/plans.json`.
+Run `uv run desk precheck <run>/plans.json`. It runs the same risk check without recording anything and says per idea why it fails. Fix what you can fix honestly (another real level, a market entry, a stop beyond the next level) and run precheck again, up to three rounds. Drop ideas that only pass by bending a level or the confidence.
 
-Design ideas inside the rules in book.md (entry distance, stop against ATR, reward/risk) before the check. If an idea was still rejected for a mechanical reason you can fix honestly (stop past a level, entry on the wrong side or too far from price), fix it once with another real level or a market entry and check again with a new file `plans-2.json` holding only that idea. Never loosen a stop or move a target past a level just to pass. Don't retry a rejection for confidence, open risk, daily loss or drawdown.
+Then run `uv run desk check <run>/plans.json` once with what's left.
+
+If the real check still rejects an idea for a mechanical reason, for example because the price moved since the precheck, fix it once and check again with a new file `plans-2.json` holding only that idea. Never loosen a stop or move a target past a level just to pass. Don't retry a rejection for confidence, open risk, daily loss or drawdown.
 
 ## 5. Report and orders
 

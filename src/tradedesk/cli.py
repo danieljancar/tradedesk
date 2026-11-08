@@ -125,6 +125,14 @@ def check(file: Path) -> None:
 
 
 @app.command()
+def precheck(file: Path) -> None:
+    """The risk check on a plans.json without recording anything. Fix and run again."""
+    for r in desk().preview_plans(file):
+        detail = "; ".join(r["reasons"]) or f"qty {r['qty']:g} risk {r['risk']:.2f} R/R {r['rr']}"
+        say(f"{r['venue']} {r['asset']} {r['side']}: {'passes' if r['ok'] else 'fails'} {detail}")
+
+
+@app.command()
 def plans(status: str = "proposed") -> None:
     """List plans by status."""
     main = desk()

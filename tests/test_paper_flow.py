@@ -116,3 +116,10 @@ def test_entries_only_checks_waiting_plans(settings, db, market, tmp_path):
     market.add(low=98.5, high=100.5)
     assert "filled" in desk.entries()[0]
     assert desk.entries() == []
+
+
+def test_precheck_records_nothing(settings, db, market, tmp_path):
+    desk = make_desk(settings, db, market)
+    [r] = desk.preview_plans(plans_file(tmp_path))
+    assert r["ok"] and r["qty"] > 0
+    assert db.all("SELECT * FROM plans") == []

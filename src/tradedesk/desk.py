@@ -402,16 +402,46 @@ class Desk:
         self.log("risk", "reject" if failed and not passed else "output", summary)
         return results
 
-    def _check_idea(self, run_id, idea: TradeIdea, book: risk.Book, facts: dict) -> dict:
+    def preview_plans(self, file: Path) -> list[dict]:
+        """The risk check without recording anything, so the PM can fix ideas first."""
+        plan_file = PlanFile.model_validate_json(file.read_text())
+        facts, out, books = self._facts(), [], {}
+        for idea in plan_file.ideas:
+            target = self.venue_of(idea)
+            book = books.get(id(target)) or books.setdefault(id(target), target.book())
+            verdict = target._verdict(idea, book, facts)
+            if verdict.ok:
+                book.open_count += 1
+                book.open_risk += verdict.risk_amount
+                book.free_quote -= verdict.notional
+                book.taken.add((idea.asset, idea.horizon.value))
+            out.append(
+                {
+                    "asset": idea.asset,
+                    "side": idea.side.value,
+                    "venue": target.settings.market.value,
+                    "ok": verdict.ok,
+                    "reasons": verdict.reasons,
+                    "qty": verdict.qty,
+                    "risk": verdict.risk_amount,
+                    "rr": verdict.reward_risk,
+                }
+            )
+        return out
+
+    def _verdict(self, idea: TradeIdea, book: risk.Book, facts: dict) -> risk.Verdict:
         symbol = self.settings.symbol(idea.asset)
         try:
             price = self.broker.price(symbol)
             rules = self.broker.rules(symbol)
         except Exception as e:
-            verdict = risk.Verdict(False, [f"no market data: {e}"])
-        else:
-            atr = risk.horizon_atr(idea.horizon, facts.get(idea.asset, {}))
-            verdict = risk.check(idea, self.settings, book, price, atr, rules)
+            return risk.Verdict(False, [f"no market data: {e}"])
+        atr = risk.horizon_atr(idea.horizon, facts.get(idea.asset, {}))
+        return risk.check(idea, self.settings, book, price, atr, rules)
+
+    def _check_idea(self, run_id, idea: TradeIdea, book: risk.Book, facts: dict) -> dict:
+        symbol = self.settings.symbol(idea.asset)
+        verdict = self._verdict(idea, book, facts)
         status = "proposed" if verdict.ok else "rejected"
         plan_id = self.db.insert(
             "plans",
