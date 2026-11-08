@@ -185,3 +185,10 @@ def test_portfolio_counts_the_futures_wallet(pair):
     assert {"asset": "Futures wallet", "value": round(fut, 2)}.items() <= next(
         a for a in s["allocation"]["by_asset"] if a["asset"] == "Futures wallet"
     ).items()
+
+
+def test_futures_follows_the_main_confidence_bar(tmp_path):
+    (tmp_path / "f.toml").write_text("[risk]\nmin_confidence = 60\n")
+    main = Settings(futures_desk=tmp_path / "f.toml")
+    main.risk.min_confidence = 55
+    assert linked_settings(main).risk.min_confidence == 55

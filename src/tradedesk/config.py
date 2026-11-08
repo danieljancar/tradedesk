@@ -241,14 +241,17 @@ def load(path: Path) -> Settings:
 
 
 def linked_settings(main: Settings) -> Settings | None:
-    """The futures wallet's settings. Runs and mode always follow the main desk."""
+    """The futures wallet's settings. Runs, mode and the confidence bar always follow the main
+    desk, so one change in settings covers both wallets."""
     if main.futures_desk is None:
         return None
     if main.market is Market.FUTURES:
         raise ValueError("futures_desk needs the main desk on market = spot")
     s = load(main.path(main.futures_desk))
+    risk = s.risk.model_copy(update={"min_confidence": main.risk.min_confidence})
     return s.model_copy(
         update={
+            "risk": risk,
             "market": Market.FUTURES,
             "mode": main.mode,
             "runs_dir": main.runs_dir,
