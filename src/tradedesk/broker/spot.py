@@ -255,6 +255,24 @@ class SpotBroker:
         sold = float(order.get("executedQty") or qty)
         return Exit(price=price, reason="manual", pnl=net_pnl(position["entry_price"], price, sold))
 
+    def reduce(self, position: dict, qty: float) -> tuple[Exit, dict]:
+        symbol, stop, target = position["symbol"], position["stop"], position["take_profit"]
+        rules = self.rules(symbol)
+        qty, rest = rules.qty(qty), rules.qty(position["qty"] - rules.qty(qty))
+        self._cancel_list(symbol, json.loads(position["exchange"])["list"])
+        try:
+            order = self._sell(symbol, qty)
+        except Exception:
+            self._protect(symbol, position["qty"], stop, target)
+            raise
+        refs = self._protect(symbol, rest, stop, target)
+        price = avg_price(order)
+        sold = float(order.get("executedQty") or qty)
+        exit_ = Exit(
+            price=price, reason="partial", pnl=net_pnl(position["entry_price"], price, sold)
+        )
+        return exit_, refs | {"qty": rest}
+
     def move_stop(self, position: dict, stop: float) -> dict:
         symbol, qty, target = position["symbol"], position["qty"], position["take_profit"]
         self._cancel_list(symbol, json.loads(position["exchange"])["list"])

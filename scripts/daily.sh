@@ -23,12 +23,14 @@ if [ -z "${FORCE:-}" ] && ! uv run desk gate >>"$log" 2>&1; then
   exit 0
 fi
 
-claude -p "/daily" --output-format json --permission-mode dontAsk --allowedTools \
+# a run the desk scheduled for itself says why
+prompt="/daily${WAKE_NOTE:+ Scheduled run: $WAKE_NOTE}"
+claude -p "$prompt" --output-format json --permission-mode dontAsk --allowedTools \
   "Bash(uv run desk run:*)" "Bash(uv run desk sync)" "Bash(uv run desk snapshot)" \
   "Bash(uv run desk news)" "Bash(uv run desk book)" "Bash(uv run desk post:*)" \
   "Bash(uv run desk precheck:*)" "Bash(uv run desk check:*)" "Bash(uv run desk execute)" "Bash(uv run desk status)" \
   "Bash(uv run desk plans:*)" "Bash(uv run desk journal:*)" \
-  "Read" "Write" "Agent" "WebSearch" >"$out" 2>>"$log"
+  "Bash(uv run desk wake:*)" "Read" "Write" "Agent" "WebSearch" "WebFetch" >"$out" 2>>"$log"
 status=$?
 cat "$out" >>"$log"; echo >>"$log"
 # one line per run with tokens and the API-equivalent cost, for the usage view

@@ -87,6 +87,9 @@ class Trailing(BaseModel):
     trail_atr: float = Field(2.0, gt=0)
     lock_pct: float = Field(50.0, ge=0, lt=100)
     min_step_atr: float = Field(0.25, ge=0)
+    # bank part of a winner once it's this many R up, the rest runs with the trailing stop
+    partial_r: float = Field(1.0, gt=0)
+    partial_pct: float = Field(50.0, ge=0, lt=100)
 
 
 class Transfers(BaseModel):

@@ -8,6 +8,7 @@ from pathlib import Path
 from tradedesk import (
     analytics,
     learning,
+    listings,
     news,
     notes,
     portfolio,
@@ -202,6 +203,12 @@ class Desk:
         run_dir = self.run_dir(self.run_id() or self.start_run())
         self.log("headlines", "start", "Reading news feeds")
         text = news.build(self.settings.news_feeds, [a["asset"] for a in self.run_assets()])
+        launches = listings.recent()
+        if launches:
+            text += "\n## Binance listing announcements, last 7 days\n" + "\n".join(
+                f"- [{datetime.fromtimestamp(a['ts'], UTC):%m-%d %H:%M}] {a['title']} {a['url']}"
+                for a in launches
+            )
         (run_dir / "news.md").write_text(text)
         count = sum(1 for ln in text.splitlines() if ln.startswith("- ["))
         self.log("headlines", "output", f"{count} headlines sorted by asset", text)
@@ -298,6 +305,10 @@ class Desk:
         lines += self._pending_lines()
         if self.linked is not None:
             lines += self.linked.wallet_lines()
+        wakes = self.db.all("SELECT * FROM wakeups WHERE done = 0 ORDER BY at")
+        if wakes:
+            lines.append("## Scheduled runs")
+            lines += [f"- {w['at'][:16]} UTC {w['note']}" for w in wakes]
         lines.append("## Last closed trades")
         closed = self.db.all(
             "SELECT * FROM positions WHERE status = 'closed' ORDER BY closed_at DESC LIMIT 8"
@@ -709,6 +720,25 @@ class Desk:
         )
         return position_id
 
+    def wake(self, at: datetime, note: str) -> str:
+        """Schedule an extra desk run for an event at a known time or a trade to watch."""
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=UTC)
+        if at <= datetime.now(UTC):
+            return "that time has passed"
+        if at - datetime.now(UTC) > timedelta(days=14):
+            return "wake-ups go at most 14 days ahead"
+        self.db.insert("wakeups", at=at.astimezone(UTC).isoformat(timespec="seconds"), note=note)
+        self.log("desk", "output", f"Run scheduled for {at:%Y-%m-%d %H:%M} UTC: {note}")
+        return f"run scheduled for {at:%Y-%m-%d %H:%M} UTC"
+
+    def due_wakeups(self) -> list[dict]:
+        """Wake-ups whose time has come, marked done so each fires once."""
+        due = self.db.all("SELECT * FROM wakeups WHERE done = 0 AND at <= ? ORDER BY at", now())
+        for w in due:
+            self.db.update("wakeups", w["id"], done=1)
+        return due
+
     def entries(self) -> list[str]:
         """Only the waiting entries, both desks. Cheap enough to run every minute, so a futures
         entry that waits for a price opens close to it."""
@@ -804,7 +834,44 @@ class Desk:
         if self.settings.execution.close_expired and held > timedelta(days=max_days):
             self.close(pos["id"], f"held longer than {max_days} days")
             return [f"position {pos['id']} closed, hold time ran out"]
-        return self._trail(pos)
+        return self._take_part(pos) + self._trail(pos)
+
+    def _take_part(self, pos: dict) -> list[str]:
+        """Bank part of a winner at partial_r, once. The stop moves to break-even with it."""
+        cfg = self.settings.trailing
+        if not cfg.enabled or not cfg.partial_pct or pos["banked"]:
+            return []
+        sign = 1 if pos["side"] == "long" else -1
+        risk = abs(pos["entry_price"] - pos["initial_stop"])
+        price = self.broker.price(pos["symbol"])
+        if risk <= 0 or (price - pos["entry_price"]) * sign / risk < cfg.partial_r:
+            return []
+        part = pos["qty"] * cfg.partial_pct / 100
+        try:
+            if part * price < self.broker.rules(pos["symbol"]).min_notional:
+                return []
+            exit_, refs = self.broker.reduce(pos, part)
+        except Exception as e:
+            self.log("exchange", "error", f"Partial close of {pos['asset']} failed: {e}")
+            return [f"position {pos['id']}: partial close failed, {e}"]
+        rest = refs.pop("qty", pos["qty"] - part)
+        self.db.update(
+            "positions",
+            pos["id"],
+            qty=rest,
+            banked=(exit_.pnl or 0.0) or 1e-9,
+            exchange=json.dumps(refs),
+        )
+        self.log(
+            "exchange",
+            "order",
+            f"{pos['asset']} banked {cfg.partial_pct:g}% at {exit_.price:g} "
+            f"({exit_.pnl or 0:+.2f}), the rest runs with the stop",
+            refs=[f"position:{pos['id']}"],
+        )
+        return [
+            f"position {pos['id']} {pos['asset']} banked {exit_.pnl or 0:+.2f} at {exit_.price:g}"
+        ]
 
     def _atr(self, symbol: str, horizon: str) -> float | None:
         frame = "4h" if horizon == Horizon.SHORT else "1d"
@@ -833,6 +900,7 @@ class Desk:
     def _close_position(self, pos: dict, price: float, reason: str, pnl: float | None) -> None:
         sign = 1 if pos["side"] == "long" else -1
         pnl = pnl if pnl is not None else (price - pos["entry_price"]) * pos["qty"] * sign
+        pnl += pos.get("banked") or 0.0
         self.db.update(
             "positions",
             pos["id"],

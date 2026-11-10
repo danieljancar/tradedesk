@@ -92,3 +92,8 @@ class PaperBroker:
 
     def move_stop(self, position: dict, stop: float) -> dict:
         return {"paper": True}
+
+    def reduce(self, position: dict, qty: float) -> tuple[Exit, dict]:
+        return self._exit(position | {"qty": qty}, self.price(position["symbol"]), "partial"), {
+            "paper": True
+        }

@@ -1,9 +1,13 @@
 ---
 description: Run the daily desk: data, analysts, bull and bear, decision, risk check, orders
-allowed-tools: Bash(uv run desk *) Read Write Agent
+allowed-tools: Bash(uv run desk *) Read Write Agent WebFetch
 ---
 
 You run the desk today and you are its portfolio manager. Keep your own messages short. The dashboard shows the process, so don't narrate it.
+
+$ARGUMENTS
+
+When the line above starts with "Scheduled run:", you scheduled this run yourself for the event it names. Run the full process, but the event comes first: check the plans and positions tied to it, place or adjust the entry, and move stops on fast trades.
 
 ## 1. Data
 
@@ -36,6 +40,8 @@ Read `universe.md`, `technical.md`, `news-read.md`, `bull.md`, `bear.md` and `bo
 Assets marked `scan` in universe.md are candidates the scanner found by momentum and volume, not picks. They are held to the same rules as the watchlist: a real setup at real levels or no trade. PAXG is gold and trades like any other asset.
 
 When book.md says shorts are allowed, judge both directions for every asset. A falling market is an opportunity on the short side, not a reason to sit out: a clean downtrend with a stop above a real level and a target at the next support is a valid idea. Short horizon (days, 4h levels) is fine when the setup is there. Pass on an asset only when neither side clears the minimum reward to risk at real levels.
+
+Trend filter: when BTC's 1d trend is down (price under the falling 1d EMA50 in technical.md), don't open spot longs. Take the idea as a futures short or pass. A spot long against it needs a specific reason the analysts named, like a listing, an unlock that's already priced or a catalyst for that coin alone, and that reason goes in the rationale.
 
 When book.md has a futures wallet section, the desk trades two wallets from this one decision. Spot holds longs without leverage and the core. Futures takes shorts and leveraged trades, one position per coin. Every idea can set `"venue"`: leave it out and shorts go to futures, longs to spot. Send a long to futures only when it is short horizon with a tight stop, where leverage is worth its risk. To act on a futures position, add `"venue": "futures"` to the position action, since the two wallets number their positions separately.
 
@@ -82,6 +88,12 @@ Run `uv run desk precheck <run>/plans.json`. It runs the same risk check without
 Then run `uv run desk check <run>/plans.json` once with what's left.
 
 If the real check still rejects an idea for a mechanical reason, for example because the price moved since the precheck, fix it once and check again with a new file `plans-2.json` holding only that idea. Never loosen a stop or move a target past a level just to pass. Don't retry a rejection for confidence, open risk, daily loss or drawdown.
+
+## Events and listings
+
+news.md has a "Binance listing announcements" section. For a new listing or a launch on a known date, WebFetch the announcement for the trading start time. Fresh listings spike and often reverse within hours, so trade them only with a futures or spot plan that has a stop at a real level, horizon short, and a limit entry placed before the event, never a chase after the first candle.
+
+For any event with a known time in the next 14 days (listing, CPI, FOMC, a token unlock, an earnings date for a tracked stock), schedule a run 10 to 30 minutes before it: `uv run desk wake <ISO time in UTC> "<event and what to do>"`. Also schedule one a few hours after entering a fast trade to manage it. One wake per event, check book.md's scheduled runs first so you don't add a duplicate.
 
 ## 5. Report and orders
 

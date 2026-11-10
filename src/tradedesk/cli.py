@@ -1,4 +1,7 @@
+import os
+import subprocess
 import time
+from datetime import datetime
 from functools import cache
 from pathlib import Path
 from typing import Annotated
@@ -188,9 +191,21 @@ def sync() -> None:
 
 
 @app.command()
+def wake(at: str, note: str) -> None:
+    """Schedule an extra desk run at an ISO time (UTC unless it has an offset), with the reason."""
+    say(desk().wake(datetime.fromisoformat(at), note))
+
+
+@app.command()
 def entries() -> None:
     """Check only the entries waiting for a price. Meant for a job every minute."""
-    lines = desk().entries()
+    d = desk()
+    lines = d.entries()
+    # scheduled runs start from here, the job that already runs every minute
+    for w in d.due_wakeups():
+        env = os.environ | {"FORCE": "1", "WAKE_NOTE": w["note"]}
+        subprocess.Popen(["bash", "scripts/daily.sh"], env=env, start_new_session=True)
+        lines.append(f"woke the desk: {w['note']}")
     if lines:
         say(lines)
 

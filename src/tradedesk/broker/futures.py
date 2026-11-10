@@ -250,7 +250,10 @@ class FuturesBroker:
         refs = json.loads(position["exchange"])
         for leg in ("stop", "target"):
             self._cancel_algo(refs[leg])
-        trades = self._trades(symbol, ms(position["opened_at"]))
+        parts = set(refs.get("parts", []))
+        trades = [
+            t for t in self._trades(symbol, ms(position["opened_at"])) if t["orderId"] not in parts
+        ]
         exit_side = "SELL" if position["side"] == "long" else "BUY"
         exits = [t for t in trades if t["side"] == exit_side]
         qty = sum(float(t["qty"]) for t in exits)
@@ -307,6 +310,22 @@ class FuturesBroker:
             reason="manual",
             pnl=(price - position["entry_price"]) * position["qty"] * sign,
         )
+
+    def reduce(self, position: dict, qty: float) -> tuple[Exit, dict]:
+        """Stop and target close the whole position, so they stay as they are."""
+        side = "SELL" if position["side"] == "long" else "BUY"
+        qty = self.rules(position["symbol"]).qty(qty)
+        cid = f"desk-part-{position['id']}-{int(time.time())}"
+        order = self._market(position["symbol"], side, qty, reduce=True, cid=cid)
+        price, done = self._filled(position["symbol"], cid, order)
+        done = min(done or qty, qty)
+        sign = 1 if position["side"] == "long" else -1
+        pnl = (price - position["entry_price"]) * done * sign
+        refs = json.loads(position["exchange"])
+        # the final result is read from trades; the banked part must not count twice
+        order_id = order.get("orderId") or self._order(position["symbol"], cid).get("orderId")
+        refs["parts"] = [*refs.get("parts", []), order_id]
+        return Exit(price=price, reason="partial", pnl=pnl), refs | {"qty": position["qty"] - done}
 
     def move_stop(self, position: dict, stop: float) -> dict:
         refs = json.loads(position["exchange"])

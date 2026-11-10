@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from tradedesk.broker.paper import PaperBroker
 from tradedesk.desk import Desk
 
@@ -123,3 +125,32 @@ def test_precheck_records_nothing(settings, db, market, tmp_path):
     [r] = desk.preview_plans(plans_file(tmp_path))
     assert r["ok"] and r["qty"] > 0
     assert db.all("SELECT * FROM plans") == []
+
+
+def test_banks_half_at_one_r_and_counts_it_in_the_result(settings, db, market, tmp_path):
+    desk = make_desk(settings, db, market)
+    [r] = desk.check_plans(plans_file(tmp_path, entry_type="market", entry=100, take_profit=113))
+    desk.approve(r["id"])
+    desk.execute()
+    pos = db.one("SELECT * FROM positions")
+    one_r = pos["entry_price"] + (pos["entry_price"] - pos["initial_stop"])
+    market.prices["BTCUSDT"] = one_r + 0.1
+    assert any("banked" in line for line in desk.sync())
+    after = db.one("SELECT * FROM positions")
+    assert after["qty"] == pytest.approx(pos["qty"] / 2) and after["banked"] > 0
+    assert not any("banked" in line for line in desk.sync())
+    desk.close(after["id"], "manual")
+    closed = db.one("SELECT * FROM positions")
+    assert closed["pnl"] > after["banked"]
+
+
+def test_wakeups_fire_once_when_due(settings, db, market):
+    from datetime import UTC, datetime, timedelta
+
+    desk = make_desk(settings, db, market)
+    assert "passed" in desk.wake(datetime.now(UTC) - timedelta(minutes=1), "late")
+    assert "scheduled" in desk.wake(datetime.now(UTC) + timedelta(hours=1), "CPI")
+    assert desk.due_wakeups() == []
+    db.conn.execute("UPDATE wakeups SET at = '2000-01-01T00:00:00+00:00'")
+    assert [w["note"] for w in desk.due_wakeups()] == ["CPI"]
+    assert desk.due_wakeups() == []

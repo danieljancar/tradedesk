@@ -50,6 +50,13 @@ CREATE TABLE IF NOT EXISTS plans (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS wakeups (
+    id INTEGER PRIMARY KEY,
+    at TEXT NOT NULL,
+    note TEXT NOT NULL,
+    done INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS positions (
     id INTEGER PRIMARY KEY,
     plan_id INTEGER REFERENCES plans(id),
@@ -142,6 +149,8 @@ COLUMNS = [
     ("outcomes", "asset_class", "TEXT"),
     ("plans", "sleeve", "TEXT NOT NULL DEFAULT 'active'"),
     ("positions", "sleeve", "TEXT NOT NULL DEFAULT 'active'"),
+    # profit already banked by a partial close, added to the final result
+    ("positions", "banked", "REAL NOT NULL DEFAULT 0"),
 ]
 
 
