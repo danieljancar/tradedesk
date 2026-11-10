@@ -8,7 +8,7 @@ You write the desk's daily market brief. It's a reference the desk and Daniel co
 2. Read the data file, the earlier briefs and `data/ticker/events.json`. If it doesn't exist yet, start it from the events in `data/ticker/calendar.md`.
 3. Do up to 8 web searches for what the data can't tell you: the event calendar for the next 8 weeks (FOMC, CPI, jobs, SNB, ECB, political and geopolitical dates like talks, summits, tariff deadlines, elections and rulings, crypto dates like Binance listings, token unlocks and ETF deadlines), what the Fed and other central banks signalled last, the political or policy stories behind the biggest moves, and the strategies or themes traders are talking about this week. Skip a search when an earlier brief already answered it and nothing changed.
 4. Write `data/ticker/<today>.md` in the layout below.
-5. Update `data/ticker/events.json`, a JSON list. It feeds Daniel's phone calendar and is public, so it holds no positions or desk plans. Keep past events in it; fix changed dates and add new ones. Each event:
+5. Update `data/ticker/events.json`, a JSON list. It feeds Daniel's phone calendar and is public, so it holds no positions or desk plans. Never delete an event, past ones stay as the record; fix changed dates and add new ones. Each event:
    - `id`: short stable slug, never changed once set, e.g. `fomc-2026-12`
    - `date` `YYYY-MM-DD`, `end` for events over several days, `time` `HH:MM` in UTC only when the clock time is known (otherwise it's an all-day event), `minutes` if it runs longer than an hour
    - `title`: short, e.g. `FOMC rate decision`

@@ -110,17 +110,14 @@ def ics(rows: list[dict], stamp: datetime | None = None) -> str:
 
 
 def write(root: Path, feed_dir: Path | None = None) -> list[Path]:
-    """calendar.md with what's coming, the feed with the last 60 days too so past
-    events stay in the calendar."""
+    """calendar.md with what's coming, the feed with every event ever added."""
     rows = load(root)
-    cutoff = datetime.now(UTC).date() - timedelta(days=60)
     md = root / "ticker" / "calendar.md"
     md.write_text(markdown(upcoming(rows)))
     out = [md]
     if feed_dir is not None:
         feed_dir.mkdir(parents=True, exist_ok=True)
         feed = feed_dir / FEED
-        kept = [e for e in rows if date.fromisoformat(e.get("end") or e["date"]) >= cutoff]
-        feed.write_text(ics(kept), newline="")
+        feed.write_text(ics(rows), newline="")
         out.append(feed)
     return out
