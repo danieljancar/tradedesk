@@ -1,3 +1,4 @@
+import socket
 from datetime import UTC, datetime
 
 import pytest
@@ -8,6 +9,17 @@ from tradedesk.db import Database
 from tradedesk.indicators import Candle
 
 RULES = SymbolRules(tick=0.01, step=0.0001, min_qty=0.0001, min_notional=5)
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch):
+    """Tests never reach the internet, so a live price can't change a result in CI."""
+
+    def refuse(*args, **kwargs):
+        raise OSError("network is off in tests")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
 
 
 class FakeMarket:
