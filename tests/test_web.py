@@ -124,3 +124,49 @@ def test_report_starts_at_the_money_put_in(settings, db, market):
     rep = c.get("/api/report").json()
     assert rep["start_equity"] == 1000
     assert rep["equity"][0]["value"] == 1050
+
+
+def test_ticker_lists_briefs_and_serves_one(settings, db, market, monkeypatch, tmp_path):
+    from tradedesk.web import app as web
+
+    monkeypatch.setattr(web, "ROOT", tmp_path)
+    folder = tmp_path / "data" / "ticker"
+    folder.mkdir(parents=True)
+    (folder / "2026-11-10.md").write_text("Stocks down 1.2%, BTC flat.\n\n## Direction\nDown.")
+    (folder / "2026-11-10-data.md").write_text("raw")
+    (folder / "calendar.md").write_text("- 2026-12-10 FOMC")
+    c, _ = client(settings, db, market)
+    listing = c.get("/api/ticker").json()
+    assert [b["date"] for b in listing["briefs"]] == ["2026-11-10"]
+    assert listing["briefs"][0]["headline"].startswith("Stocks down")
+    assert "FOMC" in listing["calendar"]
+    assert "<h2>Direction</h2>" in c.get("/api/ticker/2026-11-10").json()["html"]
+    assert c.get("/api/ticker/../x").status_code == 404
+
+
+def test_ticker_data_survives_a_dead_source(tmp_path, monkeypatch):
+    from tradedesk import ticker
+
+    def dead():
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(ticker.macro, "overview", dead)
+    monkeypatch.setattr(
+        ticker.heatmap,
+        "board",
+        lambda: {
+            "groups": [
+                {
+                    "name": "Indexes",
+                    "tiles": [
+                        {"name": "S&P 500", "symbol": "^GSPC", "1d": -1.2, "1w": 0.4, "1m": 2.0}
+                    ],
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(ticker.trending, "coins", lambda listed: [])
+    monkeypatch.setattr(ticker.wire, "headlines", lambda: [])
+    text = ticker.write_data(tmp_path).read_text()
+    assert "macro_lines unavailable: down" in text
+    assert "S&P 500 (^GSPC): 1d -1.2%" in text

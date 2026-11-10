@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
 import {
-  ArrowLeftRight, BookOpen, CandlestickChart, ChevronDown, LayoutDashboard, LineChart, Menu, Moon, Newspaper, Play, RefreshCw, Settings, Sun, Users, Wallet,
+  ArrowLeftRight, BookOpen, CandlestickChart, ChevronDown, LayoutDashboard, LineChart, Menu, Moon, Newspaper, ScrollText, Play, RefreshCw, Settings, Sun, Users, Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -21,6 +21,7 @@ export const NAV = [
   { to: "/trades", label: "Trades", icon: ArrowLeftRight },
   { to: "/performance", label: "Performance", icon: LineChart },
   { to: "/news", label: "News", icon: Newspaper },
+  { to: "/ticker", label: "Ticker", icon: ScrollText },
   { to: "/learn", label: "Learn", icon: BookOpen },
   { to: "/settings", label: "Settings", icon: Settings },
 ];

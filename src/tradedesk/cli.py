@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from tradedesk import notify
+from tradedesk import notify, ticker
 from tradedesk.config import linked_settings, settings
 from tradedesk.db import Database
 from tradedesk.desk import Desk
@@ -92,6 +92,16 @@ def snapshot() -> None:
 def news() -> None:
     """Headlines from the last 36 hours, sorted by asset."""
     say(str(desk().write_news()))
+
+
+@app.command("ticker")
+def ticker_data() -> None:
+    """Data for the daily market brief, and the earlier briefs to build on."""
+    root = Path("data")
+    say(str(ticker.write_data(root)))
+    for path in ticker.briefs(root)[: ticker.KEEP]:
+        say(str(path))
+    say(str(ticker.folder(root) / "calendar.md"))
 
 
 @app.command()

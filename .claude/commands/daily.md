@@ -31,7 +31,7 @@ Start the `bull` and `bear` subagents in one message, passing the run folder. Wa
 
 Run `uv run desk post pm --start --reads technical,news,bull,bear,book`.
 
-Read `universe.md`, `technical.md`, `news-read.md`, `bull.md`, `bear.md` and `book.md` from the run folder. Weigh the bull and bear on their merits, not on who spoke last. Conflict alone is no reason to sit out: commit to the stronger side, and size down through a lower confidence when the win is narrow. Pass when the evidence is balanced or thin. Never manufacture a trade. Follow the lessons in book.md.
+Read `universe.md`, `technical.md`, `news-read.md`, `bull.md`, `bear.md` and `book.md` from the run folder, plus the newest market brief in `data/ticker/` (`YYYY-MM-DD.md`) and `data/ticker/calendar.md` when they exist. Use the brief's direction, sectors and coming events for the horizon and side of each idea. Weigh the bull and bear on their merits, not on who spoke last. Conflict alone is no reason to sit out: commit to the stronger side, and size down through a lower confidence when the win is narrow. Pass when the evidence is balanced or thin. Never manufacture a trade. Follow the lessons in book.md.
 
 Assets marked `scan` in universe.md are candidates the scanner found by momentum and volume, not picks. They are held to the same rules as the watchlist: a real setup at real levels or no trade. PAXG is gold and trades like any other asset.
 

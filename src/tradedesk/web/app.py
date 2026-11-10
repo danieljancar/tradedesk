@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import time
 from datetime import datetime
@@ -23,6 +24,7 @@ from tradedesk import (
     patterns,
     portfolio,
     settings_io,
+    ticker,
     trending,
     universe,
     wire,
@@ -468,6 +470,34 @@ def create_app(desk: Desk) -> FastAPI:
         if rows is None:
             raise HTTPException(502, "CoinGecko did not answer")
         return rows
+
+    @app.get("/api/ticker")
+    def market_briefs() -> dict:
+        """The daily briefs, newest first, with the event calendar."""
+        root = ROOT / "data"
+        cal = ticker.folder(root) / "calendar.md"
+        return {
+            "briefs": [
+                {"date": p.stem, "headline": (p.read_text().strip().splitlines() or [""])[0]}
+                for p in ticker.briefs(root)
+            ],
+            "calendar": md.render(cal.read_text()) if cal.exists() else "",
+        }
+
+    @app.get("/api/ticker/{day}")
+    def market_brief(day: str) -> dict:
+        path = ticker.folder(ROOT / "data") / f"{day}.md"
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) or not path.exists():
+            raise HTTPException(404, "no brief for that day")
+        return {"date": day, "html": md.render(path.read_text())}
+
+    @app.post("/api/ticker")
+    def write_brief(x_desk: str | None = Header(None)) -> dict:
+        guard(x_desk)
+        subprocess.Popen(
+            ["bash", str(ROOT / "scripts" / "ticker.sh")], cwd=ROOT, start_new_session=True
+        )
+        return {"ok": True}
 
     @app.get("/api/heatmap")
     def market_heatmap() -> dict:

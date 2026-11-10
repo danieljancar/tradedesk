@@ -15,6 +15,7 @@ import Markets from "@/pages/markets";
 import Desk from "@/pages/desk";
 import Trades from "@/pages/trades";
 import News from "@/pages/news";
+import Ticker from "@/pages/ticker";
 import Learn from "@/pages/learn";
 import Settings from "@/pages/settings";
 
@@ -54,6 +55,7 @@ export default function App() {
                 <Route path="/trades" element={<Trades />} />
                 <Route path="/performance" element={<Performance />} />
                 <Route path="/news" element={<News />} />
+                <Route path="/ticker" element={<Ticker />} />
                 <Route path="/learn" element={<Learn />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
