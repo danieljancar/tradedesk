@@ -1,14 +1,22 @@
 ---
-description: Daily market brief (Handelsticker). Writes data/ticker/<date>.md and keeps data/ticker/calendar.md current.
+description: Daily market brief (Handelsticker). Writes data/ticker/<date>.md and keeps data/ticker/events.json current.
 ---
 
 You write the desk's daily market brief. It's a reference the desk and Daniel come back to, so each brief builds on the earlier ones.
 
-1. Run `uv run desk ticker`. It prints the data file for today, then up to five earlier briefs, then the calendar path.
-2. Read the data file, the earlier briefs and `data/ticker/calendar.md` if it exists.
-3. Do up to 6 web searches for what the data can't tell you: the macro calendar for the next 8 weeks (FOMC, CPI, jobs, SNB, ECB), what the Fed and other central banks signalled last, the political or policy stories behind the biggest moves, and the strategies or themes traders are talking about this week. Skip a search when an earlier brief already answered it and nothing changed.
+1. Run `uv run desk ticker`. It prints the data file for today, then up to five earlier briefs, then the events file.
+2. Read the data file, the earlier briefs and `data/ticker/events.json`. If it doesn't exist yet, start it from the events in `data/ticker/calendar.md`.
+3. Do up to 8 web searches for what the data can't tell you: the event calendar for the next 8 weeks (FOMC, CPI, jobs, SNB, ECB, political and geopolitical dates like talks, summits, tariff deadlines, elections and rulings, crypto dates like Binance listings, token unlocks and ETF deadlines), what the Fed and other central banks signalled last, the political or policy stories behind the biggest moves, and the strategies or themes traders are talking about this week. Skip a search when an earlier brief already answered it and nothing changed.
 4. Write `data/ticker/<today>.md` in the layout below.
-5. Update `data/ticker/calendar.md`: one line per future event, `YYYY-MM-DD event, what's expected, why it matters for us`. Drop past events, add new ones, fix changed dates. Keep it sorted.
+5. Update `data/ticker/events.json`, a JSON list. It feeds Daniel's phone calendar and is public, so it holds no positions or desk plans. Keep past events in it; fix changed dates and add new ones. Each event:
+   - `id`: short stable slug, never changed once set, e.g. `fomc-2026-12`
+   - `date` `YYYY-MM-DD`, `end` for events over several days, `time` `HH:MM` in UTC only when the clock time is known (otherwise it's an all-day event), `minutes` if it runs longer than an hour
+   - `title`: short, e.g. `FOMC rate decision`
+   - `category`: `macro`, `central bank`, `politics`, `geopolitics`, `crypto` or `stocks`
+   - `summary`: one sentence with what's expected
+   - `notes`: 2 to 5 sentences going deeper: consensus and forecasts with who made them, what happened last time, which way a surprise likely pushes crypto, stocks and gold
+   - `links`: 1 to 3 `{"title", "url"}` from your searches, the official source first
+   Update the notes when news changes the picture. After the event, add one sentence with the outcome.
 6. Reply with one line: the brief's path.
 
 Layout, 700 words max:

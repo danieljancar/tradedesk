@@ -22,4 +22,20 @@ print(json.dumps({
     "cost_usd": r.get("total_cost_usd"), "turns": r.get("num_turns"), "seconds": (r.get("duration_ms") or 0) / 1000,
 }))
 PY
+# the calendar feed: calendar.md for the desk, events.ics in the public market-calendar repo
+cal="${CALENDAR_REPO:-$HOME/code/market-calendar}"
+if [ ! -d "$cal/.git" ]; then
+  git clone -q git@github.com:danieljancar/market-calendar.git "$cal" 2>>"$log"
+fi
+if [ -d "$cal/.git" ]; then
+  git -C "$cal" pull -q --ff-only 2>>"$log"
+  uv run desk calendar --feed "$cal" >>"$log" 2>&1
+  if [ -n "$(git -C "$cal" status --porcelain)" ]; then
+    git -C "$cal" add -A
+    git -C "$cal" -c user.name="Daniel Jancar" -c user.email="danieljancar@bluewin.ch" \
+      commit -qm "Update events $(date +%F)" && git -C "$cal" push -q 2>>"$log"
+  fi
+else
+  uv run desk calendar >>"$log" 2>&1
+fi
 exit $status

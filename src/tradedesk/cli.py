@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from tradedesk import notify, ticker
+from tradedesk import events, notify, ticker
 from tradedesk.config import linked_settings, settings
 from tradedesk.db import Database
 from tradedesk.desk import Desk
@@ -104,7 +104,16 @@ def ticker_data() -> None:
     say(str(ticker.write_data(root)))
     for path in ticker.briefs(root)[: ticker.KEEP]:
         say(str(path))
-    say(str(ticker.folder(root) / "calendar.md"))
+    say(str(ticker.folder(root) / "events.json"))
+
+
+@app.command()
+def calendar(
+    feed: Annotated[Path | None, typer.Option(help="Folder for events.ics")] = None,
+) -> None:
+    """Render data/ticker/events.json to calendar.md and, with --feed, the iCalendar feed."""
+    for path in events.write(Path("data"), feed):
+        say(str(path))
 
 
 @app.command()
