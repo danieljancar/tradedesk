@@ -6,7 +6,14 @@ You write the desk's daily market brief. It's a reference the desk and Daniel co
 
 1. Run `uv run desk ticker`. It prints the data file for today, then up to five earlier briefs, then the events file.
 2. Read the data file, the earlier briefs and `data/ticker/events.json`. If it doesn't exist yet, start it from the events in `data/ticker/calendar.md`.
-3. Do up to 8 web searches for what the data can't tell you: the event calendar for the next 8 weeks (FOMC, CPI, jobs, SNB, ECB, political and geopolitical dates like talks, summits, tariff deadlines, elections and rulings, crypto dates like Binance listings, token unlocks and ETF deadlines), what the Fed and other central banks signalled last, the political or policy stories behind the biggest moves, and the strategies or themes traders are talking about this week. Skip a search when an earlier brief already answered it and nothing changed.
+3. Do up to 10 web searches for what the data can't tell you: the event calendar for the next 3 months, what the Fed and other central banks signalled last, the political or policy stories behind the biggest moves, and the strategies or themes traders are talking about this week. Skip a search when an earlier brief already answered it and nothing changed. The calendar is global, not only US:
+   - central banks: Fed, ECB, SNB, Bank of England, Bank of Japan, People's Bank of China, with minutes and big speeches
+   - macro data: US CPI, PPI, payrolls, GDP, PCE; eurozone and German inflation, GDP, PMI and Ifo; Swiss CPI; UK CPI; China CPI, trade and PMI; Japan CPI
+   - politics: elections, budgets and debt deadlines, trade and tariff deadlines, EU and G7/G20 summits, OPEC+ meetings, court rulings that move markets
+   - geopolitics: negotiations, ceasefires, sanctions deadlines
+   - crypto: Binance listings, large token unlocks, ETF decisions, network upgrades
+   - stocks: earnings of the largest US and Swiss companies, index rebalances
+   Events further out than a few weeks often have only a date. Add them anyway and fill in the notes as they come closer.
 4. Write `data/ticker/<today>.md` in the layout below.
 5. Update `data/ticker/events.json`, a JSON list. It feeds Daniel's phone calendar and is public, so it holds no positions or desk plans. Never delete an event, past ones stay as the record; fix changed dates and add new ones. Each event:
    - `id`: short stable slug, never changed once set, e.g. `fomc-2026-12`
