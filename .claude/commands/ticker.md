@@ -14,6 +14,8 @@ You write the desk's daily market brief. It's a reference the desk and Daniel co
    - crypto: Binance listings, large token unlocks, ETF decisions, network upgrades
    - stocks: earnings of the largest US and Swiss companies, index rebalances
    Events further out than a few weeks often have only a date. Add them anyway and fill in the notes as they come closer.
+
+   The feed goes to Daniel's phone calendar, so keep it to what's worth knowing about: on a normal week two to five events, rarely more than one a day. An event goes in the feed when it has moved markets before or could now: rate decisions, the big inflation and jobs prints of the US, eurozone and Switzerland, elections and summits with a market angle, real escalation or de-escalation, the large crypto events. Routine data (jobless claims, most PMIs, minor speeches, small unlocks and listings) is `minor`: the desk still sees it, the phone calendar doesn't. When unsure, mark it minor.
 4. Write `data/ticker/<today>.md` in the layout below.
 5. Update `data/ticker/events.json`, a JSON list. It feeds Daniel's phone calendar and is public, so it holds no positions or desk plans. Never delete an event, past ones stay as the record; fix changed dates and add new ones. Each event:
    - `id`: short stable slug, never changed once set, e.g. `fomc-2026-12`
@@ -21,6 +23,7 @@ You write the desk's daily market brief. It's a reference the desk and Daniel co
    - `title`: short, e.g. `FOMC rate decision`
    - `category`: `macro`, `central bank`, `politics`, `geopolitics`, `crypto` or `stocks`
    - `summary`: one sentence with what's expected
+   - `minor`: `true` for events only the desk needs to know about, left out otherwise
    - `notes`: 2 to 5 sentences going deeper: consensus and forecasts with who made them, what happened last time, which way a surprise likely pushes crypto, stocks and gold
    - `links`: 1 to 3 `{"title", "url"}` from your searches, the official source first
    Update the notes when news changes the picture. After the event, add one sentence with the outcome.

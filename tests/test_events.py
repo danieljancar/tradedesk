@@ -45,3 +45,12 @@ def test_markdown_lists_only_upcoming(tmp_path):
     md = events.markdown(events.upcoming(events.load(tmp_path), date(2026, 11, 10)))
     assert md.splitlines()[0].startswith("- 2026-11-20 to 2026-11-22 Iran talks")
     assert "Old event" not in md and "19:00 UTC FOMC" in md
+
+
+def test_minor_events_stay_out_of_the_feed(tmp_path):
+    (tmp_path / "ticker").mkdir()
+    rows = [*ROWS, {"id": "claims", "date": "2026-11-26", "title": "Jobless claims", "minor": True}]
+    events.path(tmp_path).write_text(json.dumps(rows))
+    md, feed = events.write(tmp_path, tmp_path / "feed")
+    assert "Jobless claims" in md.read_text()
+    assert "Jobless claims" not in feed.read_text() and "FOMC" in feed.read_text()

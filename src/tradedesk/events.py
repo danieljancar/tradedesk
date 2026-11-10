@@ -110,7 +110,8 @@ def ics(rows: list[dict], stamp: datetime | None = None) -> str:
 
 
 def write(root: Path, feed_dir: Path | None = None) -> list[Path]:
-    """calendar.md with what's coming, the feed with every event ever added."""
+    """calendar.md with everything coming for the desk, the feed with every major event ever
+    added. Minor events only help the desk and would crowd a phone calendar."""
     rows = load(root)
     md = root / "ticker" / "calendar.md"
     md.write_text(markdown(upcoming(rows)))
@@ -118,6 +119,7 @@ def write(root: Path, feed_dir: Path | None = None) -> list[Path]:
     if feed_dir is not None:
         feed_dir.mkdir(parents=True, exist_ok=True)
         feed = feed_dir / FEED
-        feed.write_text(ics(rows), newline="")
+        major = [e for e in rows if e.get("minor") is not True]
+        feed.write_text(ics(major), newline="")
         out.append(feed)
     return out
